@@ -1,7 +1,8 @@
-// WebMCP tool surface. Tools describe design intent (sectors, overtaking zones, locks) — never mouse clicks.
+// WebMCP tool surface. Tools describe design intent (sectors, overtaking zones, locks, inspirations) — never mouse clicks.
+import { ARCHETYPE_IDS, ARCHETYPES, resolveArchetype } from "./archetypes";
 import { buildGeometry, fmtLap, type Analysis, type Circuit } from "./circuit";
 import { CIRCUITS } from "./circuits";
-import { applyDesignMove, DESIGN_MOVES, editTurns, LockedError, reshapeSector, SECTOR_INTENTS, setLocks, type Intensity, type TurnEdit } from "./moves";
+import { applyDesignMove, applyInspiration, DESIGN_MOVES, editTurns, LockedError, reshapeSector, SECTOR_INTENTS, setLocks, type Intensity, type TurnEdit } from "./moves";
 import { commit, getState, loadCircuit, undo } from "./store";
 import { exportJSON, exportSVG } from "./export";
 
@@ -14,7 +15,24 @@ export type Tool = {
 };
 
 const intensity = { type: "string", enum: ["subtle", "moderate", "strong"], description: "How far to push the change. Default moderate." };
+const inspirationParam = {
+  type: "string", enum: [...ARCHETYPE_IDS],
+  description: "Design inspiration to apply. Reference phrases such as 'Monza-style' resolve to the matching id and mean its characteristics, never a real-world layout.",
+};
 const r1 = (x: number) => Math.round(x * 10) / 10;
+
+// Archetypes as the agent sees them: compact in every listing, full detail in analyze_circuit.
+const inspirations = (full: boolean) =>
+  ARCHETYPES.map((a) => ({
+    id: a.id, name: a.name, summary: a.summary, aliases: a.aliases,
+    ...(full ? { traits: a.traits, what_applying_does: a.interpretation, score_tendencies: a.tendencies, example_request: a.examplePrompt } : {}),
+  }));
+const inspiration = (v: unknown) => {
+  const a = resolveArchetype(String(v ?? ""));
+  if (!a) throw new Error(`Unknown design inspiration "${v}". Use one of: ${ARCHETYPE_IDS.join(", ")}.`);
+  return a;
+};
+const INSPIRATION_NOTE = "Design inspirations describe characteristics to apply to the live circuit. They never load or reproduce a real-world layout.";
 
 function summary(c: Circuit, a: Analysis) {
   return {
@@ -42,14 +60,23 @@ const run = async (fn: () => string) => {
 export const tools: Tool[] = [
   {
     name: "get_circuit",
-    description: "Read the live circuit exactly as the designer sees it: every turn (position in metres, radius, sector, apex/entry speed, braking drop, approach straight, overtaking score, lock state), sector summaries, scores and warnings. Coordinates: metres, +x east, +y south; the lap runs Turn 1 → N; start/finish sits on the straight from the last turn into Turn 1. Call this first and again after the human edits something.",
+    description: "Read the live circuit exactly as the designer sees it: every turn (position in metres, radius, sector, apex/entry speed, braking drop, approach straight, overtaking score, lock state), sector summaries, scores and warnings, plus the available design inspirations (high-speed, street-technical, flowing-technical) and reference layouts. Coordinates: metres, +x east, +y south; the lap runs Turn 1 → N; start/finish sits on the straight from the last turn into Turn 1. Call this first and again after the human edits something.",
     inputSchema: { type: "object", properties: {} },
     annotations: { readOnlyHint: true },
-    execute: async () => ok({ ...summary(getState().circuit, getState().analysis), reference_circuits: CIRCUITS.map((c) => ({ id: c.id, name: c.name, tagline: c.tagline })) }),
+    execute: async () => {
+      const { circuit: c, analysis: a } = getState();
+      return ok({
+        ...summary(c, a),
+        layout_example_of: c.inspiration ?? "mixed",
+        design_inspirations: inspirations(false),
+        design_inspiration_note: `${INSPIRATION_NOTE} Apply one with reshape_sector (inspiration) for a sector or apply_design_inspiration for the whole circuit; analyze_circuit lists traits and what each does.`,
+        reference_circuits: CIRCUITS.map((r) => ({ id: r.id, name: r.name, tagline: r.tagline, example_of: r.inspiration ?? "mixed" })),
+      });
+    },
   },
   {
     name: "analyze_circuit",
-    description: "Deterministic circuit design analysis with explanations: what makes each score what it is, where the strong overtaking opportunities are (heavy braking after a long approach), which turns are the best candidates to become one, sector character, and constraints. Use it to decide what to change and to verify a change achieved the goal.",
+    description: "Deterministic circuit design analysis with explanations: what makes each score what it is, where the strong overtaking opportunities are (heavy braking after a long approach), which turns are the best candidates to become one, sector character, constraints, and the design inspirations — their traits, aliases, what applying each does and which scores it moves. Use it to decide what to change and to verify a change achieved the goal.",
     inputSchema: { type: "object", properties: {} },
     annotations: { readOnlyHint: true },
     execute: async () => {
@@ -67,9 +94,13 @@ export const tools: Tool[] = [
           highSpeed: "Share of the lap spent above 250 km/h.",
         },
         sector_notes: a.sectors.map((s) => `Sector ${s.sector}: ${s.length} m, ${s.turns} turns, avg ${s.avgSpeed} km/h, ${s.character}${s === slowest ? " (slowest sector)" : ""}`),
+        layout_example_of: c.inspiration ?? "mixed",
+        design_inspirations: inspirations(true),
+        design_inspiration_note: `${INSPIRATION_NOTE} Sector scope: reshape_sector with inspiration. Whole circuit: apply_design_inspiration. Locked turns are always kept; the profile is applied around them.`,
         design_guidance: [
           "Keep total length in the brief (e.g. below 6000 m) — removing a shallow turn or chicane shortens; hairpin loops add ~400 m.",
           "Locked turns must keep their exact position and radius; change neighbours or insert turns on adjacent straights instead.",
+          "To move a sector or the circuit toward a named character (high-speed, street, flowing), apply a design inspiration; the profile decides the geometry.",
           "Prefer reshape_sector and apply_design_move; use edit_turns only for precise placement.",
         ],
       });
@@ -96,21 +127,50 @@ export const tools: Tool[] = [
   },
   {
     name: "reshape_sector",
-    description: "Reshape a whole sector toward an intent, respecting locked turns: faster (open radii, remove kinks at strong), more_technical (tighten radii and insert a chicane on the sector's longest straight; esses too at strong), more_overtaking (turn the best candidate into a heavy braking zone). The tool decides the geometry; you decide the intent.",
+    description: "Reshape a whole sector, respecting locked turns. Give either an intent — faster (open radii, remove kinks at strong), more_technical (tighten radii and insert a chicane on the sector's longest straight; esses too at strong), more_overtaking (turn the best candidate into a heavy braking zone) — or a design inspiration (high-speed, street-technical, flowing-technical), which applies that archetype's whole set of characteristics to the sector. The tool decides the geometry; you decide the intent.",
     inputSchema: {
       type: "object",
       properties: {
         sector: { type: "integer", enum: [1, 2, 3] },
-        intent: { type: "string", enum: [...SECTOR_INTENTS] },
+        intent: { type: "string", enum: [...SECTOR_INTENTS], description: "Single-axis change. Omit when giving an inspiration." },
+        inspiration: { ...inspirationParam, description: `${inspirationParam.description} Takes precedence over intent.` },
         intensity,
         reason: { type: "string", description: "One short sentence shown to the designer." },
       },
-      required: ["sector", "intent"],
+      required: ["sector"],
     },
-    execute: async ({ sector, intent, intensity, reason }) =>
+    execute: async ({ sector, intent, inspiration: insp, intensity, reason }) =>
       run(() => {
-        const r = reshapeSector(getState().circuit, Number(sector) as 1 | 2 | 3, intent as (typeof SECTOR_INTENTS)[number], intensity as Intensity);
+        const s = Number(sector) as 1 | 2 | 3;
+        if (insp) {
+          const a = inspiration(insp);
+          const r = applyInspiration(getState().circuit, a.id, s, intensity as Intensity);
+          return afterWrite(commit(r.circuit, { source: "agent", changed: r.changed, label: (reason as string) || `${a.name} · S${s}` }).text);
+        }
+        if (!intent) throw new Error(`Give an intent (${SECTOR_INTENTS.join(", ")}) or an inspiration (${ARCHETYPE_IDS.join(", ")}).`);
+        const r = reshapeSector(getState().circuit, s, intent as (typeof SECTOR_INTENTS)[number], intensity as Intensity);
         return afterWrite(commit(r.circuit, { source: "agent", changed: r.changed, label: (reason as string) || `Sector ${sector} ${String(intent).replace(/_/g, " ")}` }).text);
+      }),
+  },
+  {
+    name: "apply_design_inspiration",
+    description: "Apply a design inspiration to the whole circuit or one sector, respecting locked turns. high-speed: open radii around the existing braking zones, drop shallow kinks, and make the corner after the longest approach a heavy braking zone. street-technical: tighten radii and insert a tight chicane on the longest straight. flowing-technical: pull radii into the 70–140 m rhythm band and insert gentle linked esses on the longest straight. The start/finish straight is always kept; locked turns are designed around. Returns a receipt and the new circuit state.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        inspiration: inspirationParam,
+        sector: { type: "integer", enum: [1, 2, 3], description: "Limit the change to one sector. Omit for the whole circuit." },
+        intensity,
+        reason: { type: "string", description: "One short sentence shown to the designer, e.g. 'High-speed character for Sector 2'." },
+      },
+      required: ["inspiration"],
+    },
+    execute: async ({ inspiration: insp, sector, intensity, reason }) =>
+      run(() => {
+        const a = inspiration(insp);
+        const scope = sector === undefined || sector === null ? "circuit" : (Number(sector) as 1 | 2 | 3);
+        const r = applyInspiration(getState().circuit, a.id, scope, intensity as Intensity);
+        return afterWrite(commit(r.circuit, { source: "agent", changed: r.changed, label: (reason as string) || `${a.name} · ${scope === "circuit" ? "circuit" : `S${scope}`}` }).text);
       }),
   },
   {
