@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "check": "tsx scripts/check.ts",
-    "preview": "tsx scripts/preview.ts"
+    "preview": "tsx scripts/preview.ts",
+    "e2e": "tsx scripts/e2e.ts"
   },
   "dependencies": {
     "next": "16.3.4",
