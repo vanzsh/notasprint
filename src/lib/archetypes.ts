@@ -21,6 +21,8 @@ export type DesignArchetype = {
   interpretation: string;
   /** Direction each design score tends to move when the archetype is applied. */
   tendencies: Record<ScoreKey, Tendency>;
+  /** Measurable score bands a circuit should sit in to read as this archetype; the design brief's profile check. */
+  scoreTargets: Partial<Record<ScoreKey, { min?: number; max?: number }>>;
   /** Example request to an external agent, shown in the UI. */
   examplePrompt: string;
 };
@@ -35,6 +37,7 @@ export const ARCHETYPES: readonly DesignArchetype[] = [
     interpretation:
       "Opens corner radii as far as the neighbouring geometry allows, removes shallow kinks that interrupt straights (moderate: one, strong: two), and, until the scope has a strong overtaking zone (two at strong), tightens the corner at the end of the longest approach of at least 300 m into a heavy braking zone. Nothing is inserted and no turn is moved; the lap gets faster and simpler with a few big stops.",
     tendencies: { highSpeed: "up", overtaking: "up", flow: "neutral", technicality: "down" },
+    scoreTargets: { highSpeed: { min: 80 }, technicality: { max: 55 } },
     examplePrompt: "Make Sector 2 more high-speed.",
   },
   {
@@ -46,6 +49,7 @@ export const ARCHETYPES: readonly DesignArchetype[] = [
     interpretation:
       "Tightens corner radii, then inserts a tight chicane on the longest straight of at least 200 m (two at strong) so no section runs uninterrupted. Corner density rises, straights shorten and average corner speed falls. The start/finish straight is kept.",
     tendencies: { technicality: "up", highSpeed: "down", flow: "down", overtaking: "neutral" },
+    scoreTargets: { technicality: { min: 70 }, highSpeed: { max: 50 } },
     examplePrompt: "Add a street-style technical sequence after Turn 6.",
   },
   {
@@ -57,6 +61,7 @@ export const ARCHETYPES: readonly DesignArchetype[] = [
     interpretation:
       "Pulls corner radii toward the 70–140 m band (slow corners open, very fast sweeps tighten slightly) so consecutive corners share a rhythm, then inserts gentle linked esses on the longest straight of at least 260 m (two at strong). Sectors without such a straight only get the rhythm pass. The start/finish straight is kept.",
     tendencies: { flow: "up", technicality: "up", highSpeed: "down", overtaking: "down" },
+    scoreTargets: { flow: { min: 70 } },
     examplePrompt: "Give Sector 3 more flowing technical character.",
   },
 ];

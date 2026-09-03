@@ -210,7 +210,7 @@ function findings(turns: TurnSignal[], sectors: SectorSignal[], totals: SimTotal
 }
 
 /** Before/after view of two runs. Deltas are signed after − before; fewer congestion/contacts and more passes read as better. */
-export function compareSimulations(before: SimResult, after: SimResult) {
+export function compareSimulations(before: Pick<SimResult, "totals" | "params">, after: Pick<SimResult, "totals" | "params">) {
   const keys = ["congestion", "contacts", "overtakes", "avgGapS", "strongZones"] as const;
   const rows = keys.map((k) => ({ metric: k, before: before.totals[k], after: after.totals[k], delta: Math.round((after.totals[k] - before.totals[k]) * 10) / 10 }));
   const same = before.params.cars === after.params.cars && before.params.laps === after.params.laps && before.params.seed === after.params.seed;

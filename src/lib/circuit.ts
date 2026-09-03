@@ -385,6 +385,8 @@ export function analyze(circuit: Circuit, g = buildGeometry(circuit.turns)): Ana
 
 const clamp = (x: number) => Math.round(Math.max(0, Math.min(100, x)));
 
+export const SCORE_LABEL = { overtaking: "Overtaking", flow: "Flow", technicality: "Technical", highSpeed: "High-speed" } as const;
+
 export const fmtLap = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toFixed(1).padStart(4, "0")}`;
 export const fmtKm = (m: number) => `${(m / 1000).toFixed(2)}`;
 
