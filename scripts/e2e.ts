@@ -20,7 +20,13 @@ try {
   await new Promise((r) => (ws.onopen = r));
   let id = 0;
   const pending = new Map<number, (v: { result?: { result: { value: unknown } }; error?: unknown }) => void>();
-  ws.onmessage = (e) => { const m = JSON.parse(String(e.data)); if (pending.has(m.id)) { pending.get(m.id)!(m); pending.delete(m.id); } };
+  const errors: string[] = [];
+  ws.onmessage = (e) => {
+    const m = JSON.parse(String(e.data));
+    if (pending.has(m.id)) { pending.get(m.id)!(m); pending.delete(m.id); }
+    if (m.method === "Runtime.exceptionThrown") errors.push(m.params.exceptionDetails.exception?.description ?? m.params.exceptionDetails.text);
+    if (m.method === "Runtime.consoleAPICalled" && m.method && m.params.type === "error") errors.push(m.params.args.map((a: { value?: unknown; description?: string }) => a.value ?? a.description).join(" "));
+  };
   const send = (method: string, params = {}) => new Promise<{ result?: { result: { value: unknown } }; error?: unknown }>((r) => { pending.set(++id, r); ws.send(JSON.stringify({ id, method, params })); });
   const evalJS = async <T,>(expression: string) => {
     const m = await send("Runtime.evaluate", { expression, awaitPromise: true, returnByValue: true });
@@ -33,6 +39,7 @@ try {
   };
 
   await send("Page.enable");
+  await send("Runtime.enable");
   await send("Page.navigate", { url });
   await new Promise((r) => setTimeout(r, 2500));
 
@@ -76,7 +83,8 @@ try {
   assert.equal(denied.ok, false, "agent cannot edit the locked turn");
   console.log("receipt:", res2.receipt);
   await shot("/tmp/notasprint-e2e.png");
-  console.log("OK — screenshot at /tmp/notasprint-e2e.png");
+  assert.deepEqual(errors, [], "no browser errors");
+  console.log("OK — no console errors, screenshot at /tmp/notasprint-e2e.png");
   done(0);
 } catch (e) {
   console.error(e);

@@ -79,7 +79,9 @@ function receiptText(b: Analysis, a: Analysis, changed: number, label?: string) 
   const parts: string[] = [];
   if (label) parts.push(label);
   const delta = a.turns.length - b.turns.length;
-  parts.push(delta > 0 ? `${changed} changed · ${delta} added` : delta < 0 ? `${changed} changed · ${-delta} removed` : `${changed} element${changed === 1 ? "" : "s"} changed`);
+  if (delta > 0) parts.push(`${changed} changed · ${delta} added`);
+  else if (delta < 0) parts.push(`${changed} changed · ${-delta} removed`);
+  else if (changed || !label) parts.push(`${changed} element${changed === 1 ? "" : "s"} changed`);
   if (Math.abs(a.length - b.length) > 5) parts.push(`Length ${(b.length / 1000).toFixed(2)} → ${(a.length / 1000).toFixed(2)} km`);
   const keys = (["overtaking", "flow", "technicality", "highSpeed"] as const)
     .map((k) => ({ k, d: Math.abs(a.scores[k] - b.scores[k]) })).filter((x) => x.d >= 2).sort((x, y) => y.d - x.d).slice(0, 2);
@@ -87,4 +89,4 @@ function receiptText(b: Analysis, a: Analysis, changed: number, label?: string) 
   return parts.join(" · ");
 }
 
-export const SCORE_LABEL = { overtaking: "Overtaking", flow: "Flow", technicality: "Technicality", highSpeed: "High-speed" } as const;
+export const SCORE_LABEL = { overtaking: "Overtaking", flow: "Flow", technicality: "Technical", highSpeed: "High-speed" } as const;

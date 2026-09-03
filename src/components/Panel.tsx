@@ -12,7 +12,7 @@ export function Panel() {
       <div className="min-h-0 flex-1 overflow-y-auto">
       <Section label="Circuit">
         <div className="display text-[28px] leading-none">{circuit.name}</div>
-        <div className="mt-1 text-[12px] text-fg-muted">{circuit.tagline}</div>
+        <div className="mt-1 truncate text-[12px] text-fg-muted" title={circuit.tagline}>{circuit.tagline}</div>
         <div className="mt-4 flex items-end gap-6">
           <Hero value={fmtKm(a.length)} unit="km" label="Length" />
           <Hero value={fmtLap(a.lapTime)} unit="" label="Est. lap" />
@@ -20,31 +20,32 @@ export function Panel() {
         </div>
         <div className="mono mt-3 grid grid-cols-3 gap-x-4 text-[11px] text-fg-muted">
           <Kv k="Top speed" v={`${a.topSpeed} km/h`} />
-          <Kv k="Longest straight" v={`${a.longestStraight} m`} />
+          <Kv k="Max straight" v={`${a.longestStraight} m`} />
           <Kv k="Track width" v={`${circuit.trackWidth} m`} />
         </div>
       </Section>
 
       <Section label="Design scores">
-        <div className="grid grid-cols-4 gap-3">
+        <div className="grid grid-cols-4 gap-2">
           {(Object.keys(SCORE_LABEL) as (keyof typeof SCORE_LABEL)[]).map((k) => <Score key={k} label={SCORE_LABEL[k]} value={a.scores[k]} />)}
         </div>
       </Section>
 
-      <Section label="Speed trace">
-        <Sparkline a={a} />
+      <Section label={selIdx >= 0 ? `Turn ${selIdx + 1}` : "Selected turn"}>
+        {selIdx < 0 ? <div className="text-[12px] text-fg-dim">Click a turn to inspect it. Drag to move · double-click the track to add a turn · L locks.</div> : <Inspector key={selected} i={selIdx} />}
       </Section>
+
 
       <Section label="Sectors">
         <table className="mono w-full text-[11px]">
           <tbody>
             {a.sectors.map((s) => (
               <tr key={s.sector} className="border-t border-line first:border-t-0">
-                <td className="display py-1.5 text-[15px] text-fg">S{s.sector}</td>
-                <td className="py-1.5 text-fg-muted">{s.character}</td>
-                <td className="py-1.5 text-right text-fg-muted">{s.turns} t</td>
-                <td className="py-1.5 text-right text-fg-muted">{s.length} m</td>
-                <td className="py-1.5 text-right text-fg">{s.avgSpeed} <span className="text-fg-dim">km/h</span></td>
+                <td className="display py-1 text-[15px] text-fg">S{s.sector}</td>
+                <td className="py-1 text-fg-muted">{s.character}</td>
+                <td className="py-1 text-right text-fg-muted">{s.turns} t</td>
+                <td className="py-1 text-right text-fg-muted">{s.length} m</td>
+                <td className="py-1 text-right text-fg">{s.avgSpeed} <span className="text-fg-dim">km/h</span></td>
               </tr>
             ))}
           </tbody>
@@ -61,15 +62,16 @@ export function Panel() {
         ))}
       </Section>
 
+      <Section label="Speed trace">
+        <Sparkline a={a} />
+      </Section>
+
       {a.warnings.length > 0 && (
         <Section label="Constraints">
           {a.warnings.map((w, i) => <div key={i} className="py-0.5 text-[12px] text-fg-muted before:mr-2 before:text-accent before:content-['!']">{w}</div>)}
         </Section>
       )}
 
-      <Section label={selIdx >= 0 ? `Turn ${selIdx + 1}` : "Selected turn"}>
-        {selIdx < 0 ? <div className="text-[12px] text-fg-dim">Click a turn to inspect it. Drag to move · double-click the track to add a turn · L locks.</div> : <Inspector key={selected} i={selIdx} />}
-      </Section>
 
       </div>
       <div className="border-t border-line px-4 py-3">
@@ -150,8 +152,8 @@ function midpoint(c: { turns: { x: number; y: number }[] }, i: number) {
 
 function Section({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <section className="border-b border-line px-4 py-3.5">
-      <div className="label mb-2.5">{label}</div>
+    <section className="border-b border-line px-4 py-3">
+      <div className="label mb-2">{label}</div>
       {children}
     </section>
   );
@@ -160,7 +162,7 @@ function Hero({ value, unit, label }: { value: string; unit: string; label: stri
   return (
     <div>
       <div className="flex items-baseline gap-1.5">
-        <span key={value} className="display tick text-[40px] leading-[0.95]">{value}</span>
+        <span key={value} className="display tick text-[36px] leading-[0.95]">{value}</span>
         {unit && <span className="mono text-[11px] text-fg-muted">{unit}</span>}
       </div>
       <div className="label mt-1">{label}</div>
@@ -173,14 +175,14 @@ function Kv({ k, v }: { k: string; v: string }) {
 function Score({ label, value }: { label: string; value: number }) {
   return (
     <div>
-      <div className="label text-[10px]">{label}</div>
+      <div className="label text-[10px] tracking-[0.06em]">{label}</div>
       <div key={value} className="display tick mt-0.5 text-[28px] leading-none">{value}</div>
       <div className="mt-1.5 h-[2px] bg-line"><div className="h-full bg-fg transition-[width] duration-300" style={{ width: `${value}%` }} /></div>
     </div>
   );
 }
 function Sparkline({ a }: { a: Analysis }) {
-  const W = 320, H = 56;
+  const W = 320, H = 44;
   const pts = a.speedTrace;
   const maxS = a.length || 1;
   const d = pts.map((p, i) => `${i ? "L" : "M"}${((p.s / maxS) * W).toFixed(1)},${(H - (p.v / 360) * H).toFixed(1)}`).join(" ");
