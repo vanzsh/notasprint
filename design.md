@@ -60,7 +60,7 @@ Single-screen workstation. No scroll on the main page at ≥1280px.
 ```
 
 - The circuit is the hero. The canvas gets every pixel not needed by the panel.
-- Panel is a vertical stack of sections separated by hairlines, each with an 11px uppercase label. Sections, in order: Circuit · Design scores · Design loop / Selected turn · Design inspiration · Sectors · Overtaking · Speed trace · Constraints · Activity (pinned at the bottom).
+- Panel is a vertical stack of sections separated by hairlines, each with an 11px uppercase label. Sections, in order: Circuit · Design scores · Design loop / Selected turn · Design inspiration · Design brief · Sectors · Overtaking · Simulation · Versions · Speed trace · Geometry warnings · Activity (pinned at the bottom). "Constraints" always means the design brief; geometry problems are "warnings".
 - Top bar reads left to right: wordmark · `Reference` + layout select · Undo/Redo · agent chip · exports. "Reference" is always the word for a starting layout; "Design inspiration" is always the word for a character applied to the live circuit. Never blur the two.
 - Spacing grid: 4px. Common paddings: 12 / 16 / 24. Section gap 20.
 - Considerable negative space inside the canvas: fit the circuit with ~12% margin.
@@ -75,6 +75,8 @@ Single-screen workstation. No scroll on the main page at ≥1280px.
 - Locked turn: marker gets a second ring in `--accent`, label prefixed with a small lock glyph. Locked turns cannot be dragged and the cursor says so.
 - Sector boundaries: a 12 m tick across the track and an `S2` / `S3` label in 12px Oxanium 600, `--fg-dim`.
 - Grid legend (`GRID 100 m · N ↑`): 11px Oxanium 500, `--fg-dim`, bottom-left.
+- Simulated cars: 3px circles, `--fg` fill, 1px `--bg` stroke, no numbers, no trails, no colour coding. They exist only while the run matches the live geometry; edit a turn and they are gone, the panel says why. Lap telemetry (`SIM LAP 3/5 · 12 CARS · 8×`) is 11px Oxanium 500 `--fg-dim`, bottom-right. Nothing else moves on the canvas during playback.
+- Compare version: the other version's centreline as a dashed `--fg-muted` hairline (1.4px, 7/5 dash) over the asphalt, with a legend top-right in 11px Oxanium: `CURRENT ▬   V2 · NAME ┄`. One overlay at a time; no fills, no second set of turn markers.
 - Overtaking opportunity: a tiny `--accent` chevron ▸ before the turn number, nothing more.
 - Agent change: changed elements flash `--accent-dim` for ~900ms, then settle. No spinners, no "agent is thinking".
 
@@ -94,6 +96,9 @@ Single-screen workstation. No scroll on the main page at ≥1280px.
 - **Receipt**: single line mono, `--fg-muted`: `4 elements changed · Flow 74 → 83 · Undo`. Undo is an inline text button.
 - **Inspiration row** (Design inspiration section): archetype name in 15px Barlow, `--fg-muted` (`--fg` when open), with its three headline traits beneath in 11px mono `--fg-dim`, e.g. `HIGH-SPEED / Long straights · Heavy braking · Low corner density`. Rows are hairline-separated and act as an accordion, one open at a time. The open row shows the full trait list (11px mono muted), one example agent request in quotes, and an `Apply to  S1 S2 S3 Circuit` button row. No cards, no icons, no imagery. Failures ("every turn in Sector 2 is locked") appear beneath as a `!`-prefixed mono line, never as a modal.
 - **Design loop** (empty selection state of the turn section): one Barlow line `DRAG → LOCK → ASK AGENT → CONTINUE`, four single-line mono steps with the verb in `--fg`, then a `--fg-dim` line stating the agent status and that tool calls edit *this live circuit*. It disappears as soon as a turn is selected. Never a modal, tour or gate.
+- **Brief row**: an 11px square checkbox (`--fg` fill when on), a 104px mono label, the bound inputs (24px `.field` number inputs, mono), then right-aligned the live value in `--fg-muted` and the status word — `PASS` in `--fg`, `NEAR LIMIT` in `--fg-muted`, `FAIL` in `--accent`. Preserved turns are chips (`T7 · PASS ×`). One line per constraint; the footer reads `5/7 pass · 2 failing`. No progress bars, no traffic-light icons.
+- **Simulation controls**: native selects with self-describing options (`12 cars`, `5 laps`, `Moderate variance`), one primary `Run simulation` button. Results are one mono totals line, one `Previous → this` line, then up to five findings as `!`-prefixed rows (`--accent` for high severity, `--fg` for medium, `·` `--fg-dim` for info); clicking a finding selects the turn. Playback is `Pause` / `Play` / `Replay` buttons and a dim footnote that says "simulated design signal". Never a HUD, timer bar or leaderboard.
+- **Version row**: version id in 15px Barlow (`V2`), name in mono, then `Compare` / `Restore` / `×` as text links; a second dim mono line with length, turns, strong zones and whether a simulation is attached. The comparison is a three-column mono table (`label · a → b`) with changed values in `--fg`, unchanged in `--fg-muted`; sector rows appear only when the character changed.
 
 ## 7. Voice
 
@@ -101,6 +106,8 @@ Short, technical, confident. Labels use motorsport vocabulary: Turn, Sector, Ape
 
 Design inspirations are described as characteristics ("long straights, heavy braking"), never as places. Reference phrases such as "Monza-style" may appear as aliases in tool output for an agent's benefit; the UI itself names only the archetype (High-Speed · Street / Technical · Flowing / Technical). No real-world circuit names, logos, liveries or series branding anywhere in the product.
 
+Simulation output is always a **simulated design signal**, **hypothetical finding** or **simulation result** — "repeated bunching", "held up", "simulated contact", "passes". Never "crash", "accident", "safety", "risk", "certified" or any word that implies a real-world or regulatory claim. Brief statuses are design checks (`PASS · NEAR LIMIT · FAIL`), not compliance.
+
 ## 8. Anti-patterns (never)
 
-Carbon fiber · checkered flags · tachometers · glows · glassmorphism · rounded SaaS cards · drop shadows · rainbow speed gradients · loading theater · F1 logos or typography · broadcast overlays.
+Carbon fiber · checkered flags · tachometers · glows · glassmorphism · rounded SaaS cards · drop shadows · rainbow speed gradients · loading theater · F1 logos or typography · broadcast overlays · 3D or sprite cars · game HUDs, leaderboards or lap timers · particle or skid effects · colour-coded car liveries.
