@@ -1,4 +1,5 @@
 // Pure circuit mutations. Every edit — human or agent — routes through here, so locks are enforced once.
+import { archetypeById, type ArchetypeId } from "./archetypes";
 import { analyze, buildGeometry, type Circuit, type Turn } from "./circuit";
 
 export type Intensity = "subtle" | "moderate" | "strong";
@@ -159,6 +160,105 @@ export function reshapeSector(c: Circuit, sector: 1 | 2 | 3, intent: SectorInten
       return applyDesignMove(c, "create_overtaking_zone", cand.turn, intensity);
     }
   }
+}
+
+export type InspirationScope = 1 | 2 | 3 | "circuit";
+
+type Result = { circuit: Circuit; changed: string[] };
+
+// Shrink requested radii to what the neighbouring fillets allow, so nothing is silently clamped. Corners that existed
+// in `base` never drop below their base radius (opening is best-effort, tightening is kept); new corners take what fits.
+function fitRadii(r: Result, base: Circuit): Result {
+  const g = buildGeometry(r.circuit.turns);
+  const turns = r.circuit.turns.map((t, i) => {
+    const c = g.corners[i];
+    if (!r.changed.includes(t.id) || c.requestedRadius - c.radius <= 5) return t;
+    const b = base.turns.find((x) => x.id === t.id);
+    return { ...t, radius: Math.max(b ? Math.min(b.radius, t.radius) : 12, Math.round(c.radius)) };
+  });
+  return { circuit: withTurns(r.circuit, turns), changed: r.changed };
+}
+
+// Gentle linked esses placed inside the actual straight (between the neighbouring arcs, not the polygon edge), with the
+// lateral offset scaled to the straight so the direction changes stay medium-speed rather than becoming a chicane.
+function flowingEsses(c: Circuit, i: number, intensity: Intensity) {
+  const g = buildGeometry(c.turns);
+  const a = g.corners[i].end, b = g.corners[(i + 1) % c.turns.length].start;
+  const dx = b.x - a.x, dy = b.y - a.y, S = Math.hypot(dx, dy) || 1;
+  const cx = c.turns.reduce((s, t) => s + t.x, 0) / c.turns.length, cy = c.turns.reduce((s, t) => s + t.y, 0) / c.turns.length;
+  let nrm = { x: -dy / S, y: dx / S };
+  if ((a.x + dx / 2 - cx) * nrm.x + (a.y + dy / 2 - cy) * nrm.y < 0) nrm = { x: -nrm.x, y: -nrm.y };
+  const off = Math.max(1.2 * c.trackWidth, S * level(intensity, 0.05, 0.065, 0.08));
+  const r = level(intensity, 120, 95, 75);
+  const at = (f: number, o: number) => ({ x: Math.round(a.x + dx * f + nrm.x * o), y: Math.round(a.y + dy * f + nrm.y * o), radius: r });
+  return insertTurns(c, i, [at(0.3, off), at(0.5, -off), at(0.7, off)]);
+}
+
+/**
+ * Apply a design archetype to a sector or the whole circuit. Composes the primitives above, so locked turns are
+ * refused by the same assertUnlocked every other edit goes through; the design is reshaped around them instead.
+ * The start/finish straight (last turn → Turn 1) is never used for insertions.
+ */
+export function applyInspiration(c: Circuit, id: ArchetypeId, scope: InspirationScope, intensity: Intensity = "moderate"): Result {
+  const arch = archetypeById(id);
+  if (!arch) throw new Error(`Unknown design inspiration "${id}".`);
+  const inScope = (t: Turn) => scope === "circuit" || t.sector === scope;
+  const where = scope === "circuit" ? "The circuit" : `Sector ${scope}`;
+  if (!c.turns.some(inScope)) throw new Error(`${where} has no turns.`);
+  const free = c.turns.map((t, i) => ({ t, i })).filter(({ t }) => inScope(t) && !t.locked);
+  if (!free.length) throw new Error(`Every turn in ${where} is locked. Unlock one or choose another scope.`);
+  const features = scope === "circuit" ? level(intensity, 1, 2, 3) : level(intensity, 1, 1, 2);
+  let out: Result = { circuit: c, changed: [] };
+  const merge = (r: Result) => { out = { circuit: r.circuit, changed: [...out.changed, ...r.changed] }; };
+  const used = new Set<string>();
+  const indexOf = (turnId: string) => out.circuit.turns.findIndex((t) => t.id === turnId);
+  // Longest unused straight in scope, excluding the start/finish straight.
+  const longestStraight = (min: number) => {
+    const g = buildGeometry(out.circuit.turns);
+    const n = out.circuit.turns.length;
+    return out.circuit.turns
+      .map((t, i) => ({ id: t.id, i, len: g.corners[i].straightAfter }))
+      .filter((s) => s.i !== n - 1 && inScope(out.circuit.turns[s.i]) && !used.has(s.id) && s.len >= min)
+      .sort((p, q) => q.len - p.len)[0];
+  };
+  const insert = (min: number, fn: (i: number) => Result) => {
+    for (let k = 0; k < features; k++) {
+      const s = longestStraight(min);
+      if (!s) break;
+      used.add(s.id);
+      merge(fn(s.i));
+    }
+  };
+  switch (arch.id) {
+    case "high-speed": {
+      // Open everything except existing heavy braking zones: they are the point of a high-speed circuit.
+      const before = analyze(c).turns;
+      merge(editTurns(c, free.filter(({ i }) => before[i].overtaking < 70).map(({ t, i }) => ({ turn: i + 1, radius: Math.round(t.radius * level(intensity, 1.25, 1.5, 1.9)) }))));
+      // Fewer interruptions: drop shallow kinks that break up straights.
+      const kinks = before.filter((x) => inScope(c.turns[x.turn - 1]) && !x.locked && x.type === "kink").slice(0, level(intensity, 0, 1, 2));
+      for (const k of kinks) if (out.circuit.turns.length > 5) merge(deleteTurn(out.circuit, indexOf(k.id)));
+      // Heavy braking zones: until the scope has `features` strong ones, the corner at the end of the longest approach becomes a big stop.
+      const turns = analyze(out.circuit).turns.filter((x) => inScope(out.circuit.turns[x.turn - 1]) && x.type !== "kink");
+      const missing = features - turns.filter((x) => x.overtaking >= 70).length;
+      const stops = turns.filter((x) => !x.locked && x.overtaking < 70 && x.approach >= 300).sort((p, q) => q.approach - p.approach).slice(0, Math.max(0, missing));
+      const target = level(intensity, 45, 34, 26);
+      if (stops.length) merge(editTurns(out.circuit, stops.map((x) => ({ turn: indexOf(x.id) + 1, radius: Math.min(out.circuit.turns[indexOf(x.id)].radius, target) }))));
+      break;
+    }
+    case "street-technical": {
+      merge(editTurns(c, free.map(({ t, i }) => ({ turn: i + 1, radius: Math.max(16, Math.round(t.radius * level(intensity, 0.75, 0.6, 0.45))) }))));
+      insert(200, (i) => applyDesignMove(out.circuit, "add_chicane_after", i + 1, intensity));
+      break;
+    }
+    case "flowing-technical": {
+      // Rhythm: pull radii toward the medium/fast band so consecutive corners share a speed range.
+      const [lo, hi, k] = [70, 140, level(intensity, 0.4, 0.7, 1)];
+      merge(editTurns(c, free.map(({ t, i }) => ({ turn: i + 1, radius: Math.round(t.radius + (Math.min(hi, Math.max(lo, t.radius)) - t.radius) * k) }))));
+      insert(260, (i) => flowingEsses(out.circuit, i, intensity));
+      break;
+    }
+  }
+  return fitRadii(out, c);
 }
 
 // Human canvas actions

@@ -1,5 +1,6 @@
 // Circuit model, fillet geometry and deterministic design analysis.
 // Pure TypeScript — no DOM — so the same code runs in the browser, in WebMCP tools and in scripts/check.ts.
+import type { ArchetypeId } from "./archetypes";
 
 export type Turn = {
   id: string;
@@ -17,6 +18,7 @@ export type Circuit = {
   tagline: string;
   trackWidth: number; // metres
   turns: Turn[];
+  inspiration?: ArchetypeId; // the design archetype this reference layout is an example of; undefined = mixed
 };
 
 // Point-mass car model. Deliberately simple; it exists to make metrics coherent, not to simulate racing.
