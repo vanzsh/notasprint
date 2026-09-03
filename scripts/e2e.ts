@@ -45,10 +45,16 @@ try {
 
   const names = await evalJS<string[]>("document.modelContext.getTools().then(ts => ts.map(t => t.name).sort())");
   console.log("registered tools:", names.join(", "));
-  assert.ok(names.includes("get_circuit") && names.includes("reshape_sector"), "tools registered via WebMCP");
+  assert.ok(names.includes("get_circuit") && names.includes("reshape_sector") && names.includes("apply_design_inspiration"), "tools registered via WebMCP");
   assert.equal(await evalJS<string>("document.querySelector('.chip')?.textContent?.trim()"), "Agent connected");
+  // Onboarding and inspiration UI are visible without any interaction; circuit annotations render in Oxanium.
+  const text0 = await evalJS<string>("document.body.innerText");
+  assert.ok(text0.includes("DESIGN LOOP") && text0.includes("DESIGN INSPIRATION") && text0.includes("REFERENCE"), "design loop, inspiration and reference labels visible");
+  assert.match(await evalJS<string>("getComputedStyle(document.querySelector('.turn-handle text')).fontFamily"), /Oxanium/, "turn numbers use Oxanium");
+  assert.doesNotMatch(await evalJS<string>("getComputedStyle(document.body).fontFamily"), /Oxanium/, "product UI keeps Geist");
 
   const before = JSON.parse(await evalJS<string>(`document.modelContext.getTools().then(ts => document.modelContext.executeTool(ts.find(t => t.name === 'get_circuit'), '{}'))`));
+  assert.equal(before.design_inspirations?.length, 3, "get_circuit lists the three design inspirations");
   const res = JSON.parse(await evalJS<string>(`document.modelContext.getTools().then(ts => document.modelContext.executeTool(ts.find(t => t.name === 'reshape_sector'), JSON.stringify({ sector: 3, intent: 'faster', reason: 'Faster Sector 3' })))`));
   assert.equal(res.ok, true);
   assert.ok(res.state.sectors[2].avg_speed_kmh > before.sectors[2].avg_speed_kmh, "sector 3 got faster in the live UI");
@@ -82,6 +88,45 @@ try {
   const denied = JSON.parse(await evalJS<string>(`document.modelContext.getTools().then(ts => document.modelContext.executeTool(ts.find(t => t.name === 'edit_turns'), JSON.stringify({ edits: [{ turn: ${lockedNo}, radius: 10 }] })))`));
   assert.equal(denied.ok, false, "agent cannot edit the locked turn");
   console.log("receipt:", res2.receipt);
+
+  // Agent: design inspiration on Sector 3 via a reference alias, still around the locked turn.
+  const res3 = JSON.parse(await evalJS<string>(`document.modelContext.getTools().then(ts => document.modelContext.executeTool(ts.find(t => t.name === 'reshape_sector'), JSON.stringify({ sector: 3, inspiration: 'Suzuka-style', reason: 'Flowing Sector 3' })))`));
+  assert.equal(res3.ok, true, res3.error);
+  const kept3 = res3.state.turns.find((t: { locked?: boolean }) => t.locked);
+  assert.deepEqual([kept3.x, kept3.y, kept3.radius_m], [t7.x, t7.y, t7.radius_m], "locked T7 preserved through inspiration");
+  assert.ok(res3.state.scores.flow > res2.state.scores.flow, "sector 3 gained flow in the live UI");
+  await new Promise((r) => setTimeout(r, 300));
+  assert.ok((await evalJS<string>("document.body.innerText")).includes("Flowing Sector 3"), "inspiration receipt visible in the panel");
+  console.log("receipt:", res3.receipt);
+
+  // Design brief via the agent; status visible to the designer, including the locked turn to preserve.
+  const brief = JSON.parse(await evalJS<string>(`document.modelContext.getTools().then(ts => document.modelContext.executeTool(ts.find(t => t.name === 'set_design_brief'), JSON.stringify({ max_length_m: 5800, min_overtaking_zones: 3, preserve_turns: [${lockedNo}] })))`));
+  assert.ok(brief.ok && brief.design_brief.active && brief.design_brief.status.length === 3, "brief set through WebMCP");
+  await new Promise((r) => setTimeout(r, 300));
+  const briefText = await evalJS<string>("document.body.innerText");
+  assert.ok(briefText.includes("DESIGN BRIEF") && /PASS|FAIL|NEAR LIMIT/.test(briefText) && briefText.includes(`T${lockedNo} · PASS`), "brief statuses and the preserved locked turn render in the panel");
+
+  // Simulation: cars appear on the live circuit, findings in the panel, a stale flag after the next geometry change.
+  const sim = JSON.parse(await evalJS<string>(`document.modelContext.getTools().then(ts => document.modelContext.executeTool(ts.find(t => t.name === 'run_simulation'), JSON.stringify({ seed: 2 })))`));
+  assert.ok(sim.ok && sim.simulation.findings.length > 0 && !("frames" in sim.simulation), "run_simulation returns compact findings");
+  await new Promise((r) => setTimeout(r, 600));
+  assert.equal(await evalJS<number>("document.querySelectorAll('.sim-car').length"), 12, "12 simulated cars drawn on the canvas");
+  const simText = await evalJS<string>("document.body.innerText");
+  assert.ok(simText.includes("SIM LAP") && simText.includes("held up") && simText.includes(sim.simulation.findings[0].text.slice(0, 40)), "simulation telemetry and findings visible");
+  const res4 = JSON.parse(await evalJS<string>(`document.modelContext.getTools().then(ts => document.modelContext.executeTool(ts.find(t => t.name === 'apply_design_move'), JSON.stringify({ move: 'open_turn', turn: 2, reason: 'Open Turn 2' })))`));
+  assert.ok(res4.ok && res4.simulation_stale === true && res4.design_brief, "write receipts flag the stale simulation and carry the brief");
+  await new Promise((r) => setTimeout(r, 300));
+  assert.equal(await evalJS<number>("document.querySelectorAll('.sim-car').length"), 0, "cars leave the canvas once the geometry no longer matches the run");
+
+  // Versions: save via the agent, compare overlays on the canvas, restore is undoable.
+  const saved = JSON.parse(await evalJS<string>(`document.modelContext.getTools().then(ts => document.modelContext.executeTool(ts.find(t => t.name === 'design_versions'), JSON.stringify({ action: 'save', name: 'E2E milestone' })))`));
+  assert.equal(saved.version?.id, "v1");
+  const cmp = JSON.parse(await evalJS<string>(`document.modelContext.getTools().then(ts => document.modelContext.executeTool(ts.find(t => t.name === 'design_versions'), JSON.stringify({ action: 'compare', version_id: 'v1' })))`));
+  assert.ok(cmp.ok && cmp.comparison.rows.length > 5, "compare returns metric rows");
+  await new Promise((r) => setTimeout(r, 300));
+  const verText = await evalJS<string>("document.body.innerText");
+  assert.ok(verText.includes("VERSIONS") && verText.includes("E2E milestone") && verText.includes("CURRENT ▬"), "version list and canvas overlay legend visible");
+  await evalJS("localStorage.removeItem('notasprint.studio.v1'); 1");
   await shot("/tmp/notasprint-e2e.png");
   assert.deepEqual(errors, [], "no browser errors");
   console.log("OK — no console errors, screenshot at /tmp/notasprint-e2e.png");

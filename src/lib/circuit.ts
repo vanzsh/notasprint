@@ -1,5 +1,6 @@
 // Circuit model, fillet geometry and deterministic design analysis.
 // Pure TypeScript — no DOM — so the same code runs in the browser, in WebMCP tools and in scripts/check.ts.
+import type { ArchetypeId } from "./archetypes";
 
 export type Turn = {
   id: string;
@@ -17,6 +18,7 @@ export type Circuit = {
   tagline: string;
   trackWidth: number; // metres
   turns: Turn[];
+  inspiration?: ArchetypeId; // the design archetype this reference layout is an example of; undefined = mixed
 };
 
 // Point-mass car model. Deliberately simple; it exists to make metrics coherent, not to simulate racing.
@@ -201,7 +203,18 @@ export type Analysis = {
   speedTrace: { s: number; v: number; sector: number }[]; // downsampled for sparkline
 };
 
-export function analyze(circuit: Circuit, g = buildGeometry(circuit.turns)): Analysis {
+/** Speed profile of one lap sampled every CAR.ds metres from S/F. Shared by the analysis and the simulation. */
+export type SpeedProfile = {
+  lim: number[]; // grip-limited speed at each sample, m/s
+  v: number[]; // achievable speed after acceleration/braking passes, m/s
+  who: number[]; // corner index at each sample, -1 on straights
+  secOf: number[]; // sector at each sample
+};
+
+/** Longitudinal acceleration available at speed s (m/s²), fading to a trickle at vMax. */
+export const accelAt = (s: number) => CAR.aAcc * Math.max(0, 1 - (s / CAR.vMax) ** 2) + 0.5;
+
+export function speedProfile(circuit: Circuit, g = buildGeometry(circuit.turns)): SpeedProfile {
   const { corners } = g;
   const n = corners.length;
   // Sample the lap. Each sample: distance s, speed limit, corner index (-1 on straights).
@@ -225,17 +238,61 @@ export function analyze(circuit: Circuit, g = buildGeometry(circuit.turns)): Ana
   }
   const m = lim.length;
   const v = lim.slice();
-  const acc = (s: number) => CAR.aAcc * Math.max(0, 1 - (s / CAR.vMax) ** 2) + 0.5;
   for (let pass = 0; pass < 2; pass++) {
     for (let k = 0; k < m; k++) {
       const p = (k - 1 + m) % m;
-      v[k] = Math.min(lim[k], Math.sqrt(v[p] ** 2 + 2 * acc(v[p]) * CAR.ds));
+      v[k] = Math.min(lim[k], Math.sqrt(v[p] ** 2 + 2 * accelAt(v[p]) * CAR.ds));
     }
     for (let k = m - 1; k >= 0; k--) {
       const nx = (k + 1) % m;
       v[k] = Math.min(v[k], Math.sqrt(v[nx] ** 2 + 2 * CAR.aBrk * CAR.ds));
     }
   }
+  return { lim, v, who, secOf };
+}
+
+/**
+ * The lap as an ordered list of centreline segments starting at S/F, so a lap distance maps to a point on the
+ * real track. Used to draw simulated cars on the circuit the designer is editing — never on a copy.
+ */
+export type LapPath = { length: number; at: (s: number) => Vec };
+
+export function lapPath(g: Geometry): LapPath {
+  const n = g.corners.length;
+  const sf = startFinish(g);
+  type Seg = { len: number; at: (t: number) => Vec };
+  const line = (a: Vec, b: Vec): Seg => ({ len: len(sub(b, a)), at: (t) => ({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t }) });
+  const arc = (c: Corner): Seg => {
+    const a0 = Math.atan2(c.start.y - c.center.y, c.start.x - c.center.x);
+    const sweep = c.direction === "R" ? c.turnAngle : -c.turnAngle; // +y is down, so clockwise on screen is a right-hander
+    return { len: c.arcLength, at: (t) => ({ x: c.center.x + c.radius * Math.cos(a0 + sweep * t), y: c.center.y + c.radius * Math.sin(a0 + sweep * t) }) };
+  };
+  const segs: Seg[] = [line(sf, g.corners[0].start)];
+  for (let i = 0; i < n; i++) {
+    const c = g.corners[i];
+    if (c.radius > 0.01) segs.push(arc(c));
+    segs.push(line(c.end, i === n - 1 ? sf : g.corners[i + 1].start));
+  }
+  const cum: number[] = [];
+  let total = 0;
+  for (const s of segs) { cum.push(total); total += s.len; }
+  return {
+    length: total,
+    at: (s) => {
+      let d = ((s % total) + total) % total;
+      let i = segs.length - 1;
+      while (i > 0 && cum[i] > d) i--;
+      d -= cum[i];
+      return segs[i].at(segs[i].len > 0 ? Math.min(1, d / segs[i].len) : 0);
+    },
+  };
+}
+
+export function analyze(circuit: Circuit, g = buildGeometry(circuit.turns)): Analysis {
+  const { corners } = g;
+  const n = corners.length;
+  const { v, who, secOf } = speedProfile(circuit, g);
+  const m = v.length;
   const lapTime = v.reduce((t, s) => t + CAR.ds / s, 0);
   const topSpeed = Math.max(...v) * KMH;
   const minSpeed = Math.min(...v) * KMH;
@@ -328,5 +385,17 @@ export function analyze(circuit: Circuit, g = buildGeometry(circuit.turns)): Ana
 
 const clamp = (x: number) => Math.round(Math.max(0, Math.min(100, x)));
 
+export const SCORE_LABEL = { overtaking: "Overtaking", flow: "Flow", technicality: "Technical", highSpeed: "High-speed" } as const;
+
 export const fmtLap = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toFixed(1).padStart(4, "0")}`;
 export const fmtKm = (m: number) => `${(m / 1000).toFixed(2)}`;
+
+/** Short stable hash of the geometry that matters (positions, radii, width). Lets a result say "the circuit has changed since". */
+export function fingerprint(c: Circuit) {
+  let h = 0x811c9dc5;
+  for (const ch of `${c.trackWidth}|${c.turns.map((t) => `${Math.round(t.x)},${Math.round(t.y)},${Math.round(t.radius)}`).join(";")}`) {
+    h ^= ch.charCodeAt(0);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return h.toString(36);
+}

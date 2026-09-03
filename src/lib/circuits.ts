@@ -1,6 +1,7 @@
 import type { Circuit, Turn } from "./circuit";
 
 // Original layouts. Coordinates in metres, +y down. Every vertex is a turn; sectors are per turn.
+// Each layout is an example starting point for a design archetype (see archetypes.ts), not the archetype itself.
 const T = (x: number, y: number, radius: number, sector: 1 | 2 | 3, name?: string): Turn => ({
   id: `${x}_${y}`, x, y, radius, sector, name,
 });
@@ -33,6 +34,7 @@ export const CIRCUITS: Circuit[] = [
     name: "Temple of Speed",
     tagline: "Long straights, hard braking, high-speed character.",
     trackWidth: 13,
+    inspiration: "high-speed",
     turns: [
       T(1620, 120, 22, 1, "Variante 1"),
       T(1690, 185, 26, 1),
@@ -54,6 +56,7 @@ export const CIRCUITS: Circuit[] = [
     name: "Street Crown",
     tagline: "Compact, narrow, technical urban circuit.",
     trackWidth: 11,
+    inspiration: "street-technical",
     turns: [
       T(960, 80, 28, 1, "Harbour"),
       T(960, 230, 50, 1),
@@ -79,6 +82,7 @@ export const CIRCUITS: Circuit[] = [
     name: "Figure Eight",
     tagline: "Flowing direction changes and linked technical sequences.",
     trackWidth: 13,
+    inspiration: "flowing-technical",
     turns: [
       T(1500, 120, 90, 1, "First Curve"),
       T(1800, 340, 110, 1),

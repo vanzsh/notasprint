@@ -11,7 +11,7 @@ export function exportSVG(c: Circuit, g: Geometry) {
   const pad = 120;
   const { minX, minY, maxX, maxY } = g.bounds;
   const sf = startFinish(g);
-  const labels = c.turns.map((t, i) => `<text x="${(t.x + 10).toFixed(1)}" y="${(t.y - 10).toFixed(1)}" font-family="ui-monospace, monospace" font-size="16" fill="#F2F0EB">${i + 1}${t.name ? ` ${t.name}` : ""}</text>`).join("\n    ");
+  const labels = c.turns.map((t, i) => `<text x="${(t.x + 10).toFixed(1)}" y="${(t.y - 10).toFixed(1)}" font-family="Oxanium, ui-monospace, monospace" font-weight="600" font-size="16" fill="#F2F0EB">${i + 1}${t.name ? ` ${t.name}` : ""}</text>`).join("\n    ");
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${minX - pad} ${minY - pad} ${maxX - minX + 2 * pad} ${maxY - minY + 2 * pad}">
   <title>${c.name} — NotASprint</title>
   <rect x="${minX - pad}" y="${minY - pad}" width="${maxX - minX + 2 * pad}" height="${maxY - minY + 2 * pad}" fill="#0A0A0A"/>

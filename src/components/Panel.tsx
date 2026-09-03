@@ -1,18 +1,26 @@
 "use client";
 import { useRef, useState } from "react";
+import { ARCHETYPES, archetypeById, type ArchetypeId } from "@/lib/archetypes";
 import { fmtKm, fmtLap, type Analysis, type Circuit } from "@/lib/circuit";
-import { deleteTurn, editTurns, insertTurns, setLocks } from "@/lib/moves";
+import { applyInspiration, deleteTurn, editTurns, insertTurns, setLocks, type InspirationScope } from "@/lib/moves";
 import { commit, getState, preview, SCORE_LABEL, select, undo, useStore } from "@/lib/store";
+import { Brief } from "./Brief";
+import { Simulation } from "./Simulation";
+import { Versions } from "./Versions";
 
 export function Panel() {
   const { circuit, analysis: a, selected, receipt } = useStore((s) => s);
   const selIdx = circuit.turns.findIndex((t) => t.id === selected);
+  const example = archetypeById(circuit.inspiration ?? "")?.name;
   return (
     <aside className="flex h-full min-h-0 flex-col border-l border-line bg-surface">
       <div className="min-h-0 flex-1 overflow-y-auto">
       <Section label="Circuit">
         <div className="display text-[28px] leading-none">{circuit.name}</div>
         <div className="mt-1 truncate text-[12px] text-fg-muted" title={circuit.tagline}>{circuit.tagline}</div>
+        <div className="mono mt-1 text-[11px] text-fg-dim" title="Reference layouts are example starting points. Design inspirations (below) are characteristics applied to the live circuit.">
+          Reference layout · {example ? `${example} example` : "Mixed character"}
+        </div>
         <div className="mt-4 flex items-end gap-6">
           <Hero value={fmtKm(a.length)} unit="km" label="Length" />
           <Hero value={fmtLap(a.lapTime)} unit="" label="Est. lap" />
@@ -31,10 +39,17 @@ export function Panel() {
         </div>
       </Section>
 
-      <Section label={selIdx >= 0 ? `Turn ${selIdx + 1}` : "Selected turn"}>
-        {selIdx < 0 ? <div className="text-[12px] text-fg-dim">Click a turn to inspect it. Drag to move · double-click the track to add a turn · L locks.</div> : <Inspector key={selected} i={selIdx} />}
+      <Section label={selIdx >= 0 ? `Turn ${selIdx + 1}` : "Design loop"}>
+        {selIdx < 0 ? <DesignLoop /> : <Inspector key={selected} i={selIdx} />}
       </Section>
 
+      <Section label="Design inspiration">
+        <Inspiration />
+      </Section>
+
+      <Section label="Design brief">
+        <Brief />
+      </Section>
 
       <Section label="Sectors">
         <table className="mono w-full text-[11px]">
@@ -62,12 +77,20 @@ export function Panel() {
         ))}
       </Section>
 
+      <Section label="Simulation">
+        <Simulation />
+      </Section>
+
+      <Section label="Versions">
+        <Versions />
+      </Section>
+
       <Section label="Speed trace">
         <Sparkline a={a} />
       </Section>
 
       {a.warnings.length > 0 && (
-        <Section label="Constraints">
+        <Section label="Geometry warnings">
           {a.warnings.map((w, i) => <div key={i} className="py-0.5 text-[12px] text-fg-muted before:mr-2 before:text-accent before:content-['!']">{w}</div>)}
         </Section>
       )}
@@ -144,6 +167,65 @@ function Inspector({ i }: { i: number }) {
         <button className="btn" onClick={() => { const r = insertTurns(circuit, i, [midpoint(circuit, i)]); commit(r.circuit, { source: "human", changed: r.changed }); select(r.changed[0]); }}>Add turn after</button>
         <button className="btn" disabled={t.locked || circuit.turns.length <= 4} onClick={() => { commit(deleteTurn(circuit, i).circuit, { source: "human", label: `Removed T${i + 1}` }); select(null); }}>Remove</button>
       </div>
+    </div>
+  );
+}
+
+// Onboarding lives in the empty selection state: exactly when a new user needs it, gone once they click a turn.
+function DesignLoop() {
+  const agent = useStore((s) => s.agent);
+  return (
+    <div className="space-y-2">
+      <div className="display text-[15px] text-fg">Drag → Lock → Ask agent → Continue</div>
+      <ol className="mono space-y-1 text-[11px] text-fg-muted">
+        <li><span className="text-fg">Drag</span> to move · click to inspect · double-click to add</li>
+        <li><span className="text-fg">L</span> locks a turn — no tool can move, resize or delete it</li>
+        <li><span className="text-fg">Ask</span> the agent — it edits this live circuit, not a copy</li>
+        <li><span className="text-fg">⌘Z</span> undo · ⇧⌘Z redo · Export JSON / SVG</li>
+      </ol>
+      <div className="mono text-[11px] text-fg-dim">
+        {agent === "connected" ? "Agent connected · tool calls edit this live circuit" : agent === "unavailable" ? "No WebMCP agent detected · use the ChatGPT desktop browser or Chrome 149+ with chrome://flags/#enable-webmcp-testing" : "Checking for a WebMCP agent"}
+      </div>
+    </div>
+  );
+}
+
+// The three design archetypes. Applying one here runs the same engine function the agent's tools use.
+function Inspiration() {
+  const [open, setOpen] = useState<ArchetypeId | null>(null);
+  const [note, setNote] = useState<string | null>(null);
+  const apply = (id: ArchetypeId, scope: InspirationScope) => {
+    try {
+      const r = applyInspiration(getState().circuit, id, scope);
+      commit(r.circuit, { source: "human", changed: r.changed, label: `${archetypeById(id)!.name} · ${scope === "circuit" ? "circuit" : `S${scope}`}` });
+      setNote(null);
+    } catch (e) { setNote((e as Error).message); }
+  };
+  return (
+    <div>
+      {ARCHETYPES.map((a, k) => {
+        const isOpen = open === a.id;
+        return (
+          <div key={a.id} className={k ? "border-t border-line" : ""}>
+            <button onClick={() => setOpen(isOpen ? null : a.id)} aria-expanded={isOpen} className="group block w-full py-1.5 text-left">
+              <div className={`display text-[15px] leading-none transition-colors duration-120 group-hover:text-fg ${isOpen ? "text-fg" : "text-fg-muted"}`}>{a.name}</div>
+              <div className={`mono mt-1 text-[11px] ${isOpen ? "leading-relaxed text-fg-muted" : "text-fg-dim"}`}>{isOpen ? a.traits.join(" · ") : a.summary}</div>
+            </button>
+            {isOpen && (
+              <div className="space-y-2 pb-3">
+                <div className="text-[12px] text-fg-muted">Ask the agent <span className="mono text-fg">“{a.examplePrompt}”</span></div>
+                <div className="flex items-center gap-1.5">
+                  <span className="label mr-1">Apply to</span>
+                  {([1, 2, 3, "circuit"] as InspirationScope[]).map((s) => (
+                    <button key={String(s)} className="btn" onClick={() => apply(a.id, s)}>{s === "circuit" ? "Circuit" : `S${s}`}</button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })}
+      {note && <div className="mono mt-2 text-[11px] text-fg-muted before:mr-2 before:text-accent before:content-['!']">{note}</div>}
     </div>
   );
 }
