@@ -45,10 +45,16 @@ try {
 
   const names = await evalJS<string[]>("document.modelContext.getTools().then(ts => ts.map(t => t.name).sort())");
   console.log("registered tools:", names.join(", "));
-  assert.ok(names.includes("get_circuit") && names.includes("reshape_sector"), "tools registered via WebMCP");
+  assert.ok(names.includes("get_circuit") && names.includes("reshape_sector") && names.includes("apply_design_inspiration"), "tools registered via WebMCP");
   assert.equal(await evalJS<string>("document.querySelector('.chip')?.textContent?.trim()"), "Agent connected");
+  // Onboarding and inspiration UI are visible without any interaction; circuit annotations render in Oxanium.
+  const text0 = await evalJS<string>("document.body.innerText");
+  assert.ok(text0.includes("DESIGN LOOP") && text0.includes("DESIGN INSPIRATION") && text0.includes("REFERENCE"), "design loop, inspiration and reference labels visible");
+  assert.match(await evalJS<string>("getComputedStyle(document.querySelector('.turn-handle text')).fontFamily"), /Oxanium/, "turn numbers use Oxanium");
+  assert.doesNotMatch(await evalJS<string>("getComputedStyle(document.body).fontFamily"), /Oxanium/, "product UI keeps Geist");
 
   const before = JSON.parse(await evalJS<string>(`document.modelContext.getTools().then(ts => document.modelContext.executeTool(ts.find(t => t.name === 'get_circuit'), '{}'))`));
+  assert.equal(before.design_inspirations?.length, 3, "get_circuit lists the three design inspirations");
   const res = JSON.parse(await evalJS<string>(`document.modelContext.getTools().then(ts => document.modelContext.executeTool(ts.find(t => t.name === 'reshape_sector'), JSON.stringify({ sector: 3, intent: 'faster', reason: 'Faster Sector 3' })))`));
   assert.equal(res.ok, true);
   assert.ok(res.state.sectors[2].avg_speed_kmh > before.sectors[2].avg_speed_kmh, "sector 3 got faster in the live UI");
@@ -82,6 +88,16 @@ try {
   const denied = JSON.parse(await evalJS<string>(`document.modelContext.getTools().then(ts => document.modelContext.executeTool(ts.find(t => t.name === 'edit_turns'), JSON.stringify({ edits: [{ turn: ${lockedNo}, radius: 10 }] })))`));
   assert.equal(denied.ok, false, "agent cannot edit the locked turn");
   console.log("receipt:", res2.receipt);
+
+  // Agent: design inspiration on Sector 3 via a reference alias, still around the locked turn.
+  const res3 = JSON.parse(await evalJS<string>(`document.modelContext.getTools().then(ts => document.modelContext.executeTool(ts.find(t => t.name === 'reshape_sector'), JSON.stringify({ sector: 3, inspiration: 'Suzuka-style', reason: 'Flowing Sector 3' })))`));
+  assert.equal(res3.ok, true, res3.error);
+  const kept3 = res3.state.turns.find((t: { locked?: boolean }) => t.locked);
+  assert.deepEqual([kept3.x, kept3.y, kept3.radius_m], [t7.x, t7.y, t7.radius_m], "locked T7 preserved through inspiration");
+  assert.ok(res3.state.scores.flow > res2.state.scores.flow, "sector 3 gained flow in the live UI");
+  await new Promise((r) => setTimeout(r, 300));
+  assert.ok((await evalJS<string>("document.body.innerText")).includes("Flowing Sector 3"), "inspiration receipt visible in the panel");
+  console.log("receipt:", res3.receipt);
   await shot("/tmp/notasprint-e2e.png");
   assert.deepEqual(errors, [], "no browser errors");
   console.log("OK — no console errors, screenshot at /tmp/notasprint-e2e.png");

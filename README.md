@@ -14,11 +14,25 @@ The agent doesn't get a chatbot bolted onto the side. It gets the same product s
 3. Drag Turn 7 somewhere you like. Press `L` to lock it.
 4. Ask: *"I prefer my new Turn 7. Keep it exactly where it is and make the rest of Sector 2 more technical around it."*
    The agent reads the new live state, sees the lock, and works around your decision. Any attempt to touch a locked turn is refused by the app itself.
-5. Export JSON or SVG — from the toolbar or by asking.
+5. Ask for a character instead of a metric: *"Give Sector 3 more flowing technical character"* or *"Move Sector 2 toward the high-speed profile without changing Turn 7."*
+   The agent applies a design inspiration — linked esses, or opened radii with a heavy braking zone — still around your lock.
+6. Export JSON or SVG — from the toolbar or by asking.
 
 ## Why WebMCP
 
 Circuit design is spatial, iterative and opinionated. A human is good at *"this corner, here, keep it"*. An agent is good at *"three overtaking zones, faster Sector 3, under 6 km"*. WebMCP lets both operate on one source of truth with zero backend: the page registers tools on `document.modelContext`, the agent calls them, the UI updates instantly, and locks made with a keystroke are enforced in the same function the agent's tools route through.
+
+## Design inspiration
+
+Three named design archetypes describe *characteristics*, never places. They are structured data (`src/lib/archetypes.ts`) shared by the panel, the WebMCP tools and the move engine, so a human and an agent mean the same thing by them.
+
+| Archetype | Character | Applying it |
+|---|---|---|
+| `high-speed` | Long straights · Heavy braking · Low corner density | Opens radii around the existing braking zones, drops shallow kinks, and makes the corner after the longest approach a heavy braking zone |
+| `street-technical` | Tight radii · Dense sequences · Short straights | Tightens radii and inserts a tight chicane on the longest straight |
+| `flowing-technical` | Linked corners · Esses · Rhythm | Pulls radii into the 70–140 m band and inserts gentle linked esses on the longest straight |
+
+Reference phrases such as "Monza-style", "street circuit" or "Suzuka-style flow" resolve to an archetype's characteristics — they never load or reproduce a real-world layout. A profile can be applied to one sector or the whole circuit, from the panel or by the agent; locked turns are designed around, and the start/finish straight is kept. The reference layouts remain example starting points: Temple of Speed (high-speed), Street Crown (street), Figure Eight (flowing), Silver Fields (mixed).
 
 ## Tool surface
 
@@ -26,10 +40,11 @@ Tools describe motorsport intent, not mouse clicks.
 
 | Tool | Purpose |
 |---|---|
-| `get_circuit` | Live state: every turn (position, radius, sector, apex/entry speed, braking drop, approach straight, overtaking score, lock), sectors, scores, warnings |
-| `analyze_circuit` | Design analysis with explanations, overtaking candidates and guidance |
+| `get_circuit` | Live state: every turn (position, radius, sector, apex/entry speed, braking drop, approach straight, overtaking score, lock), sectors, scores, warnings, the design inspirations and reference layouts |
+| `analyze_circuit` | Design analysis with explanations, overtaking candidates, guidance, and each inspiration's traits, aliases, effect and score tendencies |
 | `apply_design_move` | `tighten_turn` · `open_turn` · `create_overtaking_zone` · `add_chicane_after` · `add_esses_after` · `add_hairpin_after` · `remove_turn` |
-| `reshape_sector` | `faster` · `more_technical` · `more_overtaking` for a whole sector |
+| `reshape_sector` | `faster` · `more_technical` · `more_overtaking`, or a design `inspiration`, for a whole sector |
+| `apply_design_inspiration` | `high-speed` · `street-technical` · `flowing-technical` for the whole circuit or one sector |
 | `edit_turns` | Precise position / radius / name edits |
 | `set_turn_locks` | Protect design decisions |
 | `load_reference_circuit` | Silver Fields · Temple of Speed · Street Crown · Figure Eight |
@@ -56,11 +71,11 @@ Next.js 16 · React 19 · TypeScript · Tailwind 4 · SVG. No backend, no databa
 ```sh
 pnpm install
 pnpm dev        # http://localhost:3000
-pnpm check      # replays the P0 flow through the tool executors in node
+pnpm check      # replays the P0 flow and the inspiration checks through the tool executors in node
 pnpm e2e [url]  # drives local Chrome with WebMCP enabled through the same flow
 ```
 
-Visual language lives in [`design.md`](./design.md). Layouts are original; names are nods to motorsport archetypes, not traces of real circuits.
+Visual language lives in [`design.md`](./design.md): Geist, Geist Mono and Barlow Condensed for the product UI, Oxanium for annotations drawn on the circuit itself. Layouts are original; names are nods to motorsport archetypes, not traces of real circuits.
 
 ## License
 

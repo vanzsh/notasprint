@@ -10,9 +10,10 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 # NotASprint — agent notes
 
-- `pnpm dev` — dev server. `pnpm build` must stay clean (`main` is deployable).
-- `pnpm check` — replays the P0 demo flow through the WebMCP tool executors in node (run after touching `src/lib/*`).
-- `pnpm e2e [url]` — drives local Chrome (`--enable-features=WebMCP`) through the same flow against a running server; fails on any console error.
+- `pnpm dev` — dev server. `pnpm build` must stay clean (`main` is deployable). If `pnpm` is not installed, `npx -y pnpm@10.30.3 <cmd>` runs the pinned version.
+- `pnpm check` — replays the P0 demo flow and the design-inspiration checks (archetype ids, alias resolution, tool exposure, 144 archetype × scope × intensity applications, lock preservation, undo, export) through the WebMCP tool executors in node (run after touching `src/lib/*`).
+- `pnpm e2e [url]` — drives local Chrome (`--enable-features=WebMCP`) through the same flow against a running server; fails on any console error. Pass the URL if port 3000 is taken (`pnpm dev --port 3411` then `pnpm e2e http://localhost:3411`).
 - `pnpm preview` — prints analysis for every reference circuit and writes `/tmp/notasprint-<id>.svg` previews (use when tuning layouts in `src/lib/circuits.ts`).
-- `design.md` is the visual source of truth. Check UI changes against it.
-- All circuit mutations go through `src/lib/moves.ts`; locks are enforced there, never in callers.
+- `design.md` is the visual source of truth. Check UI changes against it. Oxanium (`.track`) is only for annotations drawn on the canvas; panel and bars keep Geist / Geist Mono / Barlow.
+- All circuit mutations go through `src/lib/moves.ts`; locks are enforced there, never in callers. Design inspirations are applied by `applyInspiration`, which only composes those primitives.
+- `src/lib/archetypes.ts` is the single source for the three design inspirations (ids are part of the tool contract: `high-speed`, `street-technical`, `flowing-technical`). UI copy, tool descriptions and tests read from it — never duplicate the strings.
