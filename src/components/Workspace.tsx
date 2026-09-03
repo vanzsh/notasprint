@@ -47,15 +47,18 @@ export function Workspace() {
           <span className="label hidden sm:inline">Circuit Design Lab</span>
         </div>
         <div className="h-4 w-px bg-line" />
-        <select value={circuit.id} onChange={(e) => loadCircuit(e.target.value)} aria-label="Reference circuit">
-          {CIRCUITS.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </select>
+        <label className="flex items-center gap-2">
+          <span className="label">Reference</span>
+          <select value={circuit.id} onChange={(e) => loadCircuit(e.target.value)} aria-label="Reference layout" title="Example starting layouts. Design inspirations are applied to the live circuit from the panel or by the agent.">
+            {CIRCUITS.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        </label>
         <div className="flex items-center gap-1">
           <button className="btn" onClick={() => undo()} disabled={!canUndo} title="Undo (⌘Z)">Undo</button>
           <button className="btn" onClick={() => redo()} disabled={!canRedo} title="Redo (⇧⌘Z)">Redo</button>
         </div>
         <div className="ml-auto flex items-center gap-3">
-          <span className="chip" title={agent === "connected" ? "WebMCP tools registered — an agent in this browser can design with you." : "Open in ChatGPT's in-app browser or Chrome 149+ with chrome://flags/#enable-webmcp-testing to let an agent design with you."}>
+          <span className="chip" title={agent === "connected" ? "WebMCP tools registered — an agent in this browser reads and edits this live circuit with you." : "Open in ChatGPT's in-app browser or Chrome 149+ with chrome://flags/#enable-webmcp-testing to let an agent design with you."}>
             <span className={`dot ${agent === "connected" ? "dot-on" : ""}`} />
             {agent === "connected" ? "Agent connected" : agent === "unavailable" ? "WebMCP not detected" : "WebMCP"}
           </span>

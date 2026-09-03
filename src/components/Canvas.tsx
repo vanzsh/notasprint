@@ -116,7 +116,7 @@ export function Canvas() {
         </pattern>
       </defs>
       <rect x={f(vx)} y={f(vy)} width={vw} height={vh} fill="url(#grid-major)" />
-      <text x={f(vx + 16 * px)} y={f(vy + vh - 14 * px)} className="mono" fontSize={f(11 * px)} fill="var(--fg-dim)">GRID 100 m · N ↑</text>
+      <text x={f(vx + 16 * px)} y={f(vy + vh - 14 * px)} className="track" fontSize={f(11 * px)} fill="var(--fg-dim)">GRID 100 m · N ↑</text>
 
       {/* Track */}
       <path d={g.path} fill="none" stroke="var(--asphalt-edge)" strokeWidth={f(w + 1.4)} strokeLinejoin="round" opacity={0.75} />
@@ -130,7 +130,7 @@ export function Canvas() {
 
       {/* Start / finish */}
       <line x1={f(sf.x - sf.nx * w * 0.6)} y1={f(sf.y - sf.ny * w * 0.6)} x2={f(sf.x + sf.nx * w * 0.6)} y2={f(sf.y + sf.ny * w * 0.6)} stroke="var(--fg)" strokeWidth={f(2.2 * px)} />
-      <text x={f(sf.x - sf.nx * (w * 0.6 + 12 * px))} y={f(sf.y - sf.ny * (w * 0.6 + 12 * px))} className="mono" fontSize={f(10 * px)} fill="var(--fg-muted)" textAnchor="middle" dominantBaseline="middle">S/F</text>
+      <text x={f(sf.x - sf.nx * (w * 0.6 + 12 * px))} y={f(sf.y - sf.ny * (w * 0.6 + 12 * px))} className="track" fontSize={f(10 * px)} fill="var(--fg-muted)" textAnchor="middle" dominantBaseline="middle">S/F</text>
 
       {/* Sector boundaries */}
       {g.corners.map((c, i) => {
@@ -143,7 +143,7 @@ export function Canvas() {
         return (
           <g key={`sec-${i}`}>
             <line x1={f(mx - nx * w * 0.8)} y1={f(my - ny * w * 0.8)} x2={f(mx + nx * w * 0.8)} y2={f(my + ny * w * 0.8)} stroke="var(--fg-dim)" strokeWidth={f(1.2 * px)} />
-            <text x={f(mx + nx * (w * 0.8 + 10 * px))} y={f(my + ny * (w * 0.8 + 10 * px))} className="display" fontSize={f(12 * px)} fill="var(--fg-dim)" textAnchor="middle" dominantBaseline="middle">S{next.sector}</text>
+            <text x={f(mx + nx * (w * 0.8 + 10 * px))} y={f(my + ny * (w * 0.8 + 10 * px))} className="track" fontSize={f(12 * px)} fontWeight={600} fill="var(--fg-dim)" textAnchor="middle" dominantBaseline="middle">S{next.sector}</text>
           </g>
         );
       })}
@@ -163,9 +163,13 @@ export function Canvas() {
             <circle cx={f(ax)} cy={f(ay)} r={f(14 * px)} fill="transparent" />
             {t.locked && <circle cx={f(ax)} cy={f(ay)} r={f(7.5 * px)} fill="none" stroke="var(--accent)" strokeWidth={f(1 * px)} />}
             <circle key={isFlash ? `f-${flash!.at}` : "n"} className={isFlash ? "flash" : undefined} cx={f(ax)} cy={f(ay)} r={f(3.6 * px)} fill={isSel ? "var(--accent)" : "var(--bg)"} stroke={color} strokeWidth={f(1.3 * px)} />
-            <text x={f(ax + ox)} y={f(ay + oy)} className="mono" fontSize={f(11 * px)} fill={isSel ? "var(--accent)" : "var(--fg)"} textAnchor="middle" dominantBaseline="middle" fontWeight={500}>
+            <text x={f(ax + ox)} y={f(ay + oy)} className="track" fontSize={f(11 * px)} fill={isSel ? "var(--accent)" : "var(--fg)"} textAnchor="middle" dominantBaseline="middle" fontWeight={600}>
               {oppSet.has(t.id) && <tspan fill="var(--accent)">▸</tspan>}{i + 1}
             </text>
+            {isSel && t.name && (
+              // Name stacks on the side of the number that faces away from the asphalt.
+              <text x={f(ax + ox)} y={f(ay + oy + (oy < 0 ? -12 : 12) * px)} className="track" fontSize={f(10 * px)} fill="var(--fg-muted)" textAnchor="middle" dominantBaseline="middle">{t.name}</text>
+            )}
           </g>
         );
       })}

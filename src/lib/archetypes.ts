@@ -11,7 +11,7 @@ export type Tendency = "up" | "down" | "neutral";
 export type DesignArchetype = {
   id: ArchetypeId;
   name: string;
-  /** One line for listings and the panel. */
+  /** Three headline traits, one line, for listings and the panel. */
   summary: string;
   /** Design characteristics as short technical phrases. */
   traits: string[];
@@ -29,7 +29,7 @@ export const ARCHETYPES: readonly DesignArchetype[] = [
   {
     id: "high-speed",
     name: "High-Speed",
-    summary: "Long straights, heavy braking, low corner density.",
+    summary: "Long straights · Heavy braking · Low corner density",
     traits: ["Long straights", "Heavy braking zones", "High top-speed potential", "Low corner density", "Few low-speed interruptions", "Strong overtaking opportunities"],
     aliases: ["Monza-style", "power circuit", "speed circuit", "low-downforce circuit", "high-speed profile"],
     interpretation:
@@ -40,7 +40,7 @@ export const ARCHETYPES: readonly DesignArchetype[] = [
   {
     id: "street-technical",
     name: "Street / Technical",
-    summary: "Tight radii, dense sequences, short straights.",
+    summary: "Tight radii · Dense sequences · Short straights",
     traits: ["Short straights", "Tight-radius corners", "High corner density", "Low average corner speed", "Linked technical sequences", "Frequent direction changes"],
     aliases: ["Monaco-style", "street circuit", "urban circuit", "stop-go", "tight and twisty"],
     interpretation:
@@ -51,7 +51,7 @@ export const ARCHETYPES: readonly DesignArchetype[] = [
   {
     id: "flowing-technical",
     name: "Flowing / Technical",
-    summary: "Linked corners, esses, rhythm.",
+    summary: "Linked corners · Esses · Rhythm",
     traits: ["Linked corner sequences", "Esses and direction changes", "Medium/high-speed combinations", "Balanced technicality and speed", "Continuity between corners"],
     aliases: ["Suzuka-style", "flowing circuit", "rhythm circuit", "driver's circuit", "linked esses"],
     interpretation:

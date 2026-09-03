@@ -30,6 +30,7 @@
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --font-display: var(--font-barlow);
+  --font-track: var(--font-oxanium);
   --radius: 0;
 }
 
@@ -37,6 +38,8 @@ html, body { height: 100%; background: var(--bg); color: var(--fg); overscroll-b
 body { font-family: var(--font-geist-sans), system-ui, sans-serif; font-size: 13px; line-height: 1.4; -webkit-font-smoothing: antialiased; }
 .mono { font-family: var(--font-geist-mono), ui-monospace, monospace; font-variant-numeric: tabular-nums; }
 .display { font-family: var(--font-barlow), var(--font-geist-sans), sans-serif; text-transform: uppercase; letter-spacing: 0.02em; font-weight: 600; }
+/* Spatial circuit annotations drawn on the canvas: turn numbers, sector marks, S/F, on-track telemetry. Not product UI. */
+.track { font-family: var(--font-oxanium), var(--font-geist-mono), monospace; font-weight: 500; letter-spacing: 0.02em; font-variant-numeric: tabular-nums; }
 .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--fg-muted); }
 
 .btn {
