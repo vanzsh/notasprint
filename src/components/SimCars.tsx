@@ -30,12 +30,13 @@ export function SimCars({ result, run, g, px, view }: { result: SimResult; run: 
   const a = frames[i], b = frames[Math.min(frames.length - 1, i + 1)];
   if (!a) return null;
   const L = path.length;
-  const lap = Math.min(result.params.laps, Math.max(1, Math.floor(Math.max(...a) / L) + 1));
+  const running = a.filter((s) => !Number.isNaN(s));
+  const lap = running.length ? Math.min(result.params.laps, Math.max(1, Math.floor(Math.max(...running) / L) + 1)) : result.params.laps;
   return (
     <g className="sim-cars" pointerEvents="none">
       {a.map((sa, c) => {
         const sb = b[c];
-        if (sa < 0 || sb < 0) return null; // finished cars leave the track
+        if (Number.isNaN(sa) || Number.isNaN(sb)) return null; // finished cars leave the track
         const p = path.at(sa + (sb - sa) * k);
         return <circle key={c} className="sim-car" cx={f(p.x)} cy={f(p.y)} r={f(3 * px)} fill="var(--fg)" stroke="var(--bg)" strokeWidth={f(1 * px)} />;
       })}

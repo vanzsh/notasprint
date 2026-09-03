@@ -43,7 +43,7 @@ export type SimResult = {
   sectors: SectorSignal[];
   findings: Finding[];
   limitations: string[];
-  frames: { step: number; s: number[][] }; // playback only: per frame, each car's cumulative lap distance in metres
+  frames: { step: number; s: number[][] }; // playback only: per frame, each car's cumulative lap distance in metres (NaN once finished); never serialised
 };
 
 export const SIM_LIMITATIONS = [
@@ -146,7 +146,7 @@ export function simulate(circuit: Circuit, params: Partial<SimParams> = {}): Sim
       if (lap !== c.lap) { c.lap = lap; c.lapFactor = 1 - p.variance * 0.025 * rnd(); }
       if (c.total >= finishAt) c.finishT = t + dt - (c.total - finishAt) / Math.max(v, 1); // crossed the line this tick
     }
-    if (tick % frameEvery === 0) frames.push(cars.map((c) => (c.finishT >= 0 ? -1 : Math.round(c.total * 10) / 10)));
+    if (tick % frameEvery === 0) frames.push(cars.map((c) => (c.finishT >= 0 ? NaN : Math.round(c.total * 10) / 10))); // NaN: finished, off the track
   }
 
   // Field spread at the end: time gaps between consecutive finishers (cars still running are placed by distance).
