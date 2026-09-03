@@ -3,7 +3,7 @@ import { useSyncExternalStore } from "react";
 import { analyze, type Analysis, type Circuit } from "./circuit";
 import { CIRCUITS, DEFAULT_CIRCUIT } from "./circuits";
 
-export type Receipt = { text: string; source: "agent" | "human"; at: number };
+export type Receipt = { label?: string; text: string; source: "agent" | "human"; at: number };
 
 export type State = {
   circuit: Circuit;
@@ -35,15 +35,15 @@ const MAX_HISTORY = 60;
 export function commit(circuit: Circuit, opts: { source: "agent" | "human"; changed?: string[]; label?: string } = { source: "human" }) {
   const before = state.analysis;
   const analysis = analyze(circuit);
-  const text = receiptText(before, analysis, opts.changed?.length ?? 0, opts.label);
+  const text = receiptText(before, analysis, opts.changed?.length ?? 0, !!opts.label);
   set({
     circuit, analysis,
     past: [...state.past.slice(-MAX_HISTORY), state.circuit], future: [],
     flash: opts.source === "agent" && opts.changed?.length ? { ids: opts.changed, at: Date.now() } : state.flash,
-    receipt: { text, source: opts.source, at: Date.now() },
+    receipt: { label: opts.label, text, source: opts.source, at: Date.now() },
     selected: state.selected && circuit.turns.some((t) => t.id === state.selected) ? state.selected : null,
   });
-  return { text, before, after: analysis };
+  return { text: [opts.label, text].filter(Boolean).join(" · "), before, after: analysis };
 }
 
 /** Live preview while dragging — no history entry. */
@@ -75,9 +75,8 @@ export function loadCircuit(id: string, source: "agent" | "human" = "human") {
 export const select = (id: string | null) => set({ selected: id });
 export const setAgent = (agent: State["agent"]) => set({ agent });
 
-function receiptText(b: Analysis, a: Analysis, changed: number, label?: string) {
+function receiptText(b: Analysis, a: Analysis, changed: number, label: boolean) {
   const parts: string[] = [];
-  if (label) parts.push(label);
   const delta = a.turns.length - b.turns.length;
   if (delta > 0) parts.push(`${changed} changed · ${delta} added`);
   else if (delta < 0) parts.push(`${changed} changed · ${-delta} removed`);

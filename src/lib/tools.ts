@@ -121,7 +121,7 @@ export const tools: Tool[] = [
       properties: {
         edits: {
           type: "array", minItems: 1,
-          items: { type: "object", properties: { turn: { type: "integer" }, x: { type: "number" }, y: { type: "number" }, radius: { type: "number" }, name: { type: "string" } }, required: ["turn"] },
+          items: { type: "object", properties: { turn: { type: "integer" }, x: { type: "number" }, y: { type: "number" }, radius: { type: "number", description: "Corner radius in metres" }, name: { type: "string" } }, required: ["turn"] },
         },
         reason: { type: "string" },
       },
@@ -129,7 +129,8 @@ export const tools: Tool[] = [
     },
     execute: async ({ edits, reason }) =>
       run(() => {
-        const r = editTurns(getState().circuit, edits as TurnEdit[]);
+        const norm = (edits as (TurnEdit & { radius_m?: number })[]).map(({ radius_m, ...e }) => ({ ...e, radius: e.radius ?? radius_m }));
+        const r = editTurns(getState().circuit, norm);
         return afterWrite(commit(r.circuit, { source: "agent", changed: r.changed, label: (reason as string) || undefined }).text);
       }),
   },

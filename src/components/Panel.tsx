@@ -77,10 +77,13 @@ export function Panel() {
       <div className="border-t border-line px-4 py-3">
         <div className="label mb-1.5">Activity</div>
         {receipt ? (
-          <div key={receipt.at} className="mono tick flex items-baseline gap-2 text-[11px] text-fg-muted">
-            <span className={`shrink-0 ${receipt.source === "agent" ? "text-fg" : "text-fg-dim"}`}>{receipt.source === "agent" ? "AGENT" : "YOU"}</span>
-            <span className="min-w-0 flex-1">{receipt.text}</span>
-            <button onClick={() => undo()} className="shrink-0 underline decoration-line-strong underline-offset-2 hover:text-fg">Undo</button>
+          <div key={receipt.at} className="mono tick text-[11px] text-fg-muted">
+            <div className="flex items-baseline gap-2">
+              <span className={`shrink-0 ${receipt.source === "agent" ? "text-fg" : "text-fg-dim"}`}>{receipt.source === "agent" ? "AGENT" : "YOU"}</span>
+              <span className="min-w-0 flex-1 truncate text-fg" title={receipt.label ?? receipt.text}>{receipt.label ?? receipt.text}</span>
+              <button onClick={() => undo()} className="shrink-0 underline decoration-line-strong underline-offset-2 hover:text-fg">Undo</button>
+            </div>
+            {receipt.label && receipt.text && <div className="mt-0.5 truncate pl-[calc(5ch+8px)]" title={receipt.text}>{receipt.text}</div>}
           </div>
         ) : (
           <div className="mono text-[11px] text-fg-dim">No changes yet · ⌘Z undo · ⇧⌘Z redo</div>
