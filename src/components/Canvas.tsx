@@ -1,8 +1,9 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { buildGeometry, startFinish, type Circuit } from "@/lib/circuit";
+import { buildGeometry, fingerprint, startFinish, type Circuit } from "@/lib/circuit";
 import { insertTurnOnSegment, moveTurn } from "@/lib/moves";
 import { commit, preview, select, useStore } from "@/lib/store";
+import { SimCars } from "./SimCars";
 
 const PAD = 0.14;
 const f = (n: number) => Math.round(n * 100) / 100; // stable across server/client float formatting
@@ -20,7 +21,11 @@ export function Canvas() {
   const analysis = useStore((s) => s.analysis);
   const selected = useStore((s) => s.selected);
   const flash = useStore((s) => s.flash);
+  const simulation = useStore((s) => s.simulation);
+  const simRun = useStore((s) => s.simRun);
+  const compareVersion = useStore((s) => (s.compare ? s.versions.find((v) => v.id === s.compare) ?? null : null));
   const g = useMemo(() => buildGeometry(circuit.turns), [circuit.turns]);
+  const comparePath = useMemo(() => (compareVersion ? buildGeometry(compareVersion.circuit.turns).path : null), [compareVersion]);
   const svgRef = useRef<SVGSVGElement>(null);
   const [size, setSize] = useState({ w: 1200, h: 800 });
   const drag = useRef<{ id: string; start: Circuit; moved: boolean; from: { x: number; y: number }; vertex: { x: number; y: number } } | null>(null);
@@ -121,6 +126,15 @@ export function Canvas() {
       {/* Track */}
       <path d={g.path} fill="none" stroke="var(--asphalt-edge)" strokeWidth={f(w + 1.4)} strokeLinejoin="round" opacity={0.75} />
       <path d={g.path} fill="none" stroke="var(--asphalt)" strokeWidth={f(w)} strokeLinejoin="round" />
+      {/* Compare version: its centreline as a dashed hairline, so the difference reads without competing with the track */}
+      {comparePath && compareVersion && (
+        <g pointerEvents="none">
+          <path d={comparePath} fill="none" stroke="var(--fg-muted)" strokeWidth={f(1.4 * px)} strokeDasharray={`${f(7 * px)} ${f(5 * px)}`} strokeLinejoin="round" opacity={0.9} />
+          <text x={f(vx + vw - 16 * px)} y={f(vy + 22 * px)} className="track" fontSize={f(11 * px)} fill="var(--fg-dim)" textAnchor="end">
+            <tspan fill="var(--fg)">CURRENT ▬</tspan>{"   "}{compareVersion.id.toUpperCase()} · {compareVersion.name.toUpperCase()} ┄
+          </text>
+        </g>
+      )}
       {[...flashSet].map((id) => {
         const i = circuit.turns.findIndex((t) => t.id === id);
         const c = g.corners[i];
@@ -173,6 +187,9 @@ export function Canvas() {
           </g>
         );
       })}
+
+      {/* Simulated cars on this circuit's own centreline; hidden once the geometry no longer matches the run */}
+      {simulation && simulation.fingerprint === fingerprint(circuit) && <SimCars result={simulation} run={simRun} g={g} px={px} view={{ x: vx, y: vy, w: vw, h: vh }} />}
     </svg>
   );
 }

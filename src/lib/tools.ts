@@ -333,7 +333,7 @@ export const tools: Tool[] = [
         const find = (id: unknown) => { const v = versions.find((x) => x.id === String(id).toLowerCase()); if (!v) throw new Error(`Unknown version "${id}". Available: ${versions.map((x) => x.id).join(", ") || "none"}`); return v; };
         switch (action) {
           case "list": return ok({ ok: true, versions: versions.map(versionView), comparing: getState().compare });
-          case "save": { const v = saveVersion(String(name ?? getState().receipt?.label ?? ""), "agent"); return ok({ ok: true, version: versionView(v), receipt: `Saved ${v.id.toUpperCase()} · ${v.name}` }); }
+          case "save": { const v = saveVersion(String(name ?? getState().lastChange ?? ""), "agent"); return ok({ ok: true, version: versionView(v), receipt: `Saved ${v.id.toUpperCase()} · ${v.name}` }); }
           case "restore": { const v = restoreVersion(find(version_id).id, "agent"); return afterWrite(`Restored ${v.id.toUpperCase()} · ${v.name}`); }
           case "compare": {
             const a = find(version_id);

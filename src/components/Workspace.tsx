@@ -3,7 +3,7 @@ import { useEffect } from "react";
 import { buildGeometry } from "@/lib/circuit";
 import { CIRCUITS } from "@/lib/circuits";
 import { deleteTurn, setLocks } from "@/lib/moves";
-import { commit, getState, loadCircuit, redo, select, undo, useStore } from "@/lib/store";
+import { commit, getState, hydrate, loadCircuit, redo, select, undo, useStore } from "@/lib/store";
 import { exportJSON, exportSVG } from "@/lib/export";
 import { download } from "@/lib/tools";
 import { registerWebMCP } from "@/lib/webmcp";
@@ -17,6 +17,7 @@ export function Workspace() {
   const canRedo = useStore((s) => s.future.length > 0);
 
   useEffect(() => registerWebMCP(), []);
+  useEffect(() => { hydrate(); }, []); // brief and versions from localStorage, after mount so the first render matches the server
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

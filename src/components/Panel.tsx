@@ -4,6 +4,9 @@ import { ARCHETYPES, archetypeById, type ArchetypeId } from "@/lib/archetypes";
 import { fmtKm, fmtLap, type Analysis, type Circuit } from "@/lib/circuit";
 import { applyInspiration, deleteTurn, editTurns, insertTurns, setLocks, type InspirationScope } from "@/lib/moves";
 import { commit, getState, preview, SCORE_LABEL, select, undo, useStore } from "@/lib/store";
+import { Brief } from "./Brief";
+import { Simulation } from "./Simulation";
+import { Versions } from "./Versions";
 
 export function Panel() {
   const { circuit, analysis: a, selected, receipt } = useStore((s) => s);
@@ -44,6 +47,10 @@ export function Panel() {
         <Inspiration />
       </Section>
 
+      <Section label="Design brief">
+        <Brief />
+      </Section>
+
       <Section label="Sectors">
         <table className="mono w-full text-[11px]">
           <tbody>
@@ -70,12 +77,20 @@ export function Panel() {
         ))}
       </Section>
 
+      <Section label="Simulation">
+        <Simulation />
+      </Section>
+
+      <Section label="Versions">
+        <Versions />
+      </Section>
+
       <Section label="Speed trace">
         <Sparkline a={a} />
       </Section>
 
       {a.warnings.length > 0 && (
-        <Section label="Constraints">
+        <Section label="Geometry warnings">
           {a.warnings.map((w, i) => <div key={i} className="py-0.5 text-[12px] text-fg-muted before:mr-2 before:text-accent before:content-['!']">{w}</div>)}
         </Section>
       )}

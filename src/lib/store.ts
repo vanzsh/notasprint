@@ -17,6 +17,7 @@ export type State = {
   selected: string | null;
   flash: { ids: string[]; at: number } | null;
   receipt: Receipt | null;
+  lastChange: string | null; // label of the most recent geometry change; the natural name for a version
   agent: "connected" | "unavailable" | "unknown";
   brief: Brief;
   simParams: SimParams;
@@ -28,7 +29,7 @@ export type State = {
 };
 
 let state: State = {
-  circuit: DEFAULT_CIRCUIT, analysis: analyze(DEFAULT_CIRCUIT), past: [], future: [], selected: null, flash: null, receipt: null, agent: "unknown",
+  circuit: DEFAULT_CIRCUIT, analysis: analyze(DEFAULT_CIRCUIT), past: [], future: [], selected: null, flash: null, receipt: null, lastChange: null, agent: "unknown",
   brief: {}, simParams: DEFAULT_SIM, simulation: null, simulationBefore: null, simRun: 0, versions: [], compare: null,
 };
 const listeners = new Set<() => void>();
@@ -53,6 +54,7 @@ export function commit(circuit: Circuit, opts: { source: "agent" | "human"; chan
     past: [...state.past.slice(-MAX_HISTORY), state.circuit], future: [],
     flash: opts.source === "agent" && opts.changed?.length ? { ids: opts.changed, at: Date.now() } : state.flash,
     receipt: { label: opts.label, text, source: opts.source, at: Date.now() },
+    lastChange: opts.label ?? state.lastChange,
     selected: state.selected && circuit.turns.some((t) => t.id === state.selected) ? state.selected : null,
   });
   return { text: [opts.label, text].filter(Boolean).join(" · "), before, after: analysis };
@@ -80,7 +82,7 @@ export function redo() {
 export function loadCircuit(id: string, source: "agent" | "human" = "human") {
   const c = CIRCUITS.find((x) => x.id === id);
   if (!c) throw new Error(`Unknown circuit "${id}". Available: ${CIRCUITS.map((x) => x.id).join(", ")}`);
-  set({ circuit: c, analysis: analyze(c), past: [], future: [], selected: null, flash: null, receipt: { text: `Loaded ${c.name}`, source, at: Date.now() }, simulation: null, simulationBefore: null, compare: null });
+  set({ circuit: c, analysis: analyze(c), past: [], future: [], selected: null, flash: null, receipt: { text: `Loaded ${c.name}`, source, at: Date.now() }, lastChange: `${c.name} concept`, simulation: null, simulationBefore: null, compare: null });
   return c;
 }
 
