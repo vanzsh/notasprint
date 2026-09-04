@@ -9,16 +9,22 @@ import { compactResult, DEFAULT_SIM, simulate, type CompactSimResult, type SimPa
 import { deserializeVersions, makeVersion, MAX_VERSIONS, serializeVersions, type Snapshot, type Version } from "./versions";
 export { SCORE_LABEL };
 
-export type Receipt = { label?: string; text: string; source: "agent" | "human"; at: number };
+/**
+ * One activity record. Human edits carry a label/text; a WebMCP call additionally carries the tool name, whether it
+ * succeeded and a short local id — real event data, never a network origin.
+ */
+export type Receipt = { id: string; label?: string; text: string; source: "agent" | "human"; at: number; tool?: string; ok?: boolean };
 
 export type State = {
   circuit: Circuit;
+  origin: Circuit; // the circuit as loaded or generated; Reset returns to it
   analysis: Analysis;
   past: Circuit[];
   future: Circuit[];
   selected: string | null;
   flash: { ids: string[]; at: number } | null;
-  receipt: Receipt | null;
+  receipt: Receipt | null; // newest activity record
+  events: Receipt[]; // newest first, capped
   lastChange: string | null; // label of the most recent geometry change; the natural name for a version
   agent: "connected" | "unavailable" | "unknown";
   brief: Brief;
@@ -31,12 +37,33 @@ export type State = {
 };
 
 let state: State = {
-  circuit: DEFAULT_CIRCUIT, analysis: analyze(DEFAULT_CIRCUIT), past: [], future: [], selected: null, flash: null, receipt: null, lastChange: null, agent: "unknown",
+  circuit: DEFAULT_CIRCUIT, origin: DEFAULT_CIRCUIT, analysis: analyze(DEFAULT_CIRCUIT), past: [], future: [], selected: null, flash: null, receipt: null, events: [], lastChange: null, agent: "unknown",
   brief: {}, simParams: DEFAULT_SIM, simulation: null, simulationBefore: null, simRun: 0, versions: [], compare: null,
 };
 const listeners = new Set<() => void>();
 const emit = () => listeners.forEach((l) => l());
 const set = (patch: Partial<State>) => { state = { ...state, ...patch }; emit(); };
+
+// Short local event id (#A72F): a counter mixed with the clock, formatted as four hex digits.
+let seq = 0;
+const eventId = () => `#${(((++seq * 0x9e3779b1) ^ Date.now()) >>> 0).toString(16).toUpperCase().slice(-4).padStart(4, "0")}`;
+const MAX_EVENTS = 40;
+/** State patch that records a new activity event and makes it the current receipt. */
+const note = (r: Omit<Receipt, "id" | "at"> & { at?: number }): Pick<State, "receipt" | "events"> => {
+  const receipt: Receipt = { ...r, id: eventId(), at: r.at ?? Date.now() };
+  return { receipt, events: [receipt, ...state.events].slice(0, MAX_EVENTS) };
+};
+/**
+ * Attach a WebMCP call to the activity log. If the call already produced an event (a write), that event is tagged with
+ * the tool and outcome; a read-only or failed call gets its own compact record.
+ */
+export function logCall(tool: string, ok: boolean, startedAt: number, summary?: string) {
+  const [latest, ...rest] = state.events;
+  if (latest && latest.source === "agent" && latest.at >= startedAt && !latest.tool) {
+    const tagged = { ...latest, tool, ok };
+    set({ receipt: tagged, events: [tagged, ...rest] });
+  } else set(note({ source: "agent", tool, ok, text: summary ?? "" }));
+}
 
 export const getState = () => state;
 export const subscribe = (l: () => void) => { listeners.add(l); return () => listeners.delete(l); };
@@ -55,7 +82,7 @@ export function commit(circuit: Circuit, opts: { source: "agent" | "human"; chan
     circuit, analysis,
     past: [...state.past.slice(-MAX_HISTORY), state.circuit], future: [],
     flash: opts.source === "agent" && opts.changed?.length ? { ids: opts.changed, at: Date.now() } : state.flash,
-    receipt: { label: opts.label, text, source: opts.source, at: Date.now() },
+    ...note({ label: opts.label, text, source: opts.source }),
     lastChange: opts.label ?? state.lastChange,
     selected: state.selected && circuit.turns.some((t) => t.id === state.selected) ? state.selected : null,
   });
@@ -83,9 +110,11 @@ export function redo() {
 
 /** Replace the workspace with a circuit: history, selection, simulation and comparison all start over. */
 function mount(c: Circuit, source: "agent" | "human", label: string) {
-  set({ circuit: c, analysis: analyze(c), past: [], future: [], selected: null, flash: null, receipt: { text: label, source, at: Date.now() }, lastChange: `${c.name} concept`, simulation: null, simulationBefore: null, compare: null });
+  set({ circuit: c, origin: c, analysis: analyze(c), past: [], future: [], selected: null, flash: null, ...note({ text: label, source }), lastChange: `${c.name} concept`, simulation: null, simulationBefore: null, compare: null });
   return c;
 }
+/** Back to the circuit as it was loaded or generated. An ordinary, undoable commit. */
+export const resetCircuit = (source: "agent" | "human" = "human") => commit(state.origin, { source, label: "Reset to starting layout" });
 export function loadCircuit(id: string, source: "agent" | "human" = "human") {
   const c = circuitById(id);
   if (!c) throw new Error(`Unknown circuit "${id}". Available: ${CIRCUITS.map((x) => x.id).join(", ")}`);
@@ -109,7 +138,7 @@ export function setBrief(patch: Partial<Record<keyof Brief, Brief[keyof Brief] |
     if (v === undefined || v === null || (Array.isArray(v) && v.length === 0)) delete brief[k];
     else (brief as Record<string, unknown>)[k] = v;
   }
-  set({ brief, receipt: { label: isBriefEmpty(brief) ? "Brief cleared" : "Brief updated", text: "", source, at: Date.now() } });
+  set({ brief, ...note({ label: isBriefEmpty(brief) ? "Brief cleared" : "Brief updated", text: "", source }) });
   persist();
   return brief;
 }
@@ -123,7 +152,7 @@ export function runSimulation(params: Partial<SimParams> = {}, source: "agent" |
   const result = simulate(state.circuit, simParams);
   set({
     simParams, simulation: result, simulationBefore: state.simulation ? compactResult(state.simulation) : state.simulationBefore, simRun: state.simRun + 1,
-    receipt: { label: `Simulation · ${simParams.cars} ${SERIES[state.circuit.series].noun}s · ${simParams.laps} laps`, text: `${result.totals.congestion} held up · ${result.totals.contacts} contacts · ${result.totals.overtakes} passes`, source, at: Date.now() },
+    ...note({ label: `Simulation · ${simParams.cars} ${SERIES[state.circuit.series].noun}s · ${simParams.laps} laps`, text: `${result.totals.congestion} held up · ${result.totals.contacts} contacts · ${result.totals.overtakes} passes`, source }),
   });
   return result;
 }
@@ -135,7 +164,7 @@ export const snapshot = (): Snapshot => ({ circuit: state.circuit, analysis: sta
 
 export function saveVersion(name: string, source: "agent" | "human" = "human") {
   const v = makeVersion(state.versions, name, snapshot(), source);
-  set({ versions: [...state.versions, v].slice(-MAX_VERSIONS), receipt: { label: `Saved ${v.id.toUpperCase()} · ${v.name}`, text: "", source, at: Date.now() } });
+  set({ versions: [...state.versions, v].slice(-MAX_VERSIONS), ...note({ label: `Saved ${v.id.toUpperCase()} · ${v.name}`, text: "", source }) });
   persist();
   return v;
 }

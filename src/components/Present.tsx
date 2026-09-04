@@ -28,7 +28,7 @@ export function Present({ onExit }: { onExit: () => void }) {
           <div className="mt-2 max-w-[520px] text-[13px] text-fg-muted">{circuit.tagline}</div>
         </div>
         <div className="pointer-events-auto flex items-center gap-3">
-          <span className="mono text-[11px] text-fg-dim">Esc to exit</span>
+          <span className="text-[11px] text-fg-dim"><kbd className="mono">Esc</kbd> to exit</span>
           <Tooltip>
             <TooltipTrigger asChild><Button size="icon" onClick={onExit} aria-label="Exit presentation"><Minimize2 /></Button></TooltipTrigger>
             <TooltipContent>Back to the workspace</TooltipContent>
@@ -54,7 +54,7 @@ export function Present({ onExit }: { onExit: () => void }) {
           ))}
         </div>
       </div>
-      <div className="mono pointer-events-none absolute bottom-2 right-8 text-[10px] text-fg-dim">NotASprint · design analysis, not survey data</div>
+      <div className="pointer-events-none absolute bottom-2 right-8 text-[10px] text-fg-dim">NotASprint · design analysis, not survey data</div>
     </div>
   );
 }

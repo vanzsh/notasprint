@@ -50,14 +50,14 @@ export function ReferenceLibrary({ open, onOpenChange }: { open: boolean; onOpen
                   <span className="flex size-9 items-center justify-center rounded-sm border border-line-strong text-fg-muted transition-colors duration-120 group-hover:border-fg group-hover:text-fg"><Plus className="size-4" /></span>
                   <span className="display text-[20px] leading-none">Create custom</span>
                   <span className="text-[12px] text-fg-muted">A new {SERIES[s].name} concept, different every time.</span>
-                  <span className="mono text-[11px] text-fg-dim">{SERIES[s].generator.length[0] / 1000}–{SERIES[s].generator.length[1] / 1000} km · {SERIES[s].generator.turns[0]}–{SERIES[s].generator.turns[1]} turns · seed reproducible</span>
+                  <span className="text-[11px] text-fg-dim"><span className="mono">{SERIES[s].generator.length[0] / 1000}–{SERIES[s].generator.length[1] / 1000} km · {SERIES[s].generator.turns[0]}–{SERIES[s].generator.turns[1]} turns</span> · reproducible by seed</span>
                 </button>
               </div>
             </TabsContent>
           ))}
         </Tabs>
         <DialogFooter>
-          <span className="mono shrink-0 text-[11px] text-fg-dim">Schematic interpretations for design inspiration · not survey data</span>
+          <span className="shrink-0 text-[11px] text-fg-dim">Schematic interpretations for design inspiration · not survey data</span>
           <span className="truncate text-[10px] text-fg-dim">For representation purposes only. Not affiliated with or endorsed by the referenced racing series or circuits.</span>
         </DialogFooter>
       </DialogContent>
@@ -72,7 +72,7 @@ function ReferenceCard({ circuit: c, loaded, onPick }: { circuit: Circuit; loade
       <div className="relative min-h-0 flex-1 p-3">
         <Schematic circuit={c} className="h-full w-full" />
         {loaded && <span className="chip absolute top-2 right-2 border-fg text-fg">Loaded</span>}
-        {c.character && <span className="mono absolute bottom-2 left-3 text-[10px] uppercase tracking-[0.08em] text-fg-dim">{c.character.join(" · ")}</span>}
+        {c.character && <span className="label absolute bottom-2 left-3 text-[10px] text-fg-dim">{c.character.join(" · ")}</span>}
       </div>
       <div className="border-t border-line px-3 py-2.5">
         <div className="display truncate text-[20px] leading-none">{c.name}</div>

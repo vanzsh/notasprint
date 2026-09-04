@@ -40,26 +40,26 @@ export function Simulation() {
         {result && !stale && (ended
           ? <Button size="icon" onClick={() => restart(run)} aria-label="Replay"><RotateCcw /></Button>
           : <Button size="icon" onClick={() => (playing ? pause() : play())} aria-label={playing ? "Pause" : "Play"}>{playing ? <Pause /> : <Play />}</Button>)}
-        {result && <span className="mono ml-auto truncate text-[11px] text-fg-dim">seed {result.params.seed}</span>}
+        {result && <span className="ml-auto truncate text-[11px] text-fg-dim">seed <span className="mono">{result.params.seed}</span></span>}
       </div>
       {!result ? (
         <div className="text-[12px] text-fg-dim">Race a small field of {noun}s around this circuit and read where they bunch, pass or make contact. Simulated design signals, not real-world predictions.</div>
       ) : (
         <>
-          {stale && <div className="mono text-[11px] text-fg-muted before:mr-2 before:text-accent before:content-['!']">Circuit changed since this run · run again for current signals</div>}
+          {stale && <div className="text-[12px] text-fg-muted before:mr-2 before:text-accent before:content-['!']">Circuit changed since this run · run again for current signals</div>}
           <div className="grid grid-cols-5 gap-x-2 border-y border-line py-2">
             <Stat v={result.totals.congestion} k="held up" /><Stat v={result.totals.contacts} k="contacts" /><Stat v={result.totals.overtakes} k="passes" /><Stat v={result.totals.avgGapS} unit="s" k="avg gap" /><Stat v={result.totals.spreadS} unit="s" k="spread" />
           </div>
-          {cmp && <div className="mono text-[11px] text-fg-muted" title={cmp.comparable ? "Same cars, laps and seed as the previous run" : "Previous run used different parameters"}>Previous → this{cmp.comparable ? "" : " (different parameters)"} · {cmp.summary}</div>}
+          {cmp && <div className="text-[12px] text-fg-muted" title={cmp.comparable ? "Same field, laps and seed as the previous run" : "Previous run used different parameters"}>Previous → this{cmp.comparable ? "" : " (different parameters)"} · <span className="mono text-[11px]">{cmp.summary}</span></div>}
           <div>
             {result.findings.slice(0, 5).map((f, i) => (
               <button key={i} onClick={() => f.turns.length && select(circuit.turns[f.turns[0] - 1]?.id ?? null)} className="-mx-2 flex w-[calc(100%+16px)] items-start gap-2 rounded-sm px-2 py-1 text-left text-[12px] leading-snug text-fg-muted enabled:hover:bg-surface-2 enabled:hover:text-fg" disabled={!f.turns.length}>
                 <span className={cn("mono shrink-0", MARK[f.severity])}>{f.severity === "info" ? "·" : "!"}</span><span>{f.text}</span>
               </button>
             ))}
-            {result.findings.length > 5 && <div className="mono pl-4 text-[11px] text-fg-dim">+{result.findings.length - 5} more via analyze_circuit</div>}
+            {result.findings.length > 5 && <div className="pl-4 text-[11px] text-fg-dim">+{result.findings.length - 5} more via <span className="mono">analyze_circuit</span></div>}
           </div>
-          <div className="mono text-[11px] text-fg-dim">Simulated design signal · point-mass model</div>
+          <div className="text-[11px] text-fg-dim">Simulated design signal · point-mass model</div>
         </>
       )}
     </div>
@@ -80,7 +80,7 @@ function Stat({ v, k, unit }: { v: number | string; k: string; unit?: string }) 
   return (
     <div className="flex min-w-0 flex-col">
       <span className="mono truncate text-[12px] text-fg">{v}{unit && <span className="text-fg-dim"> {unit}</span>}</span>
-      <span className="mono truncate text-[10px] text-fg-dim">{k}</span>
+      <span className="truncate text-[10px] text-fg-dim">{k}</span>
     </div>
   );
 }

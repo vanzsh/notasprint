@@ -55,7 +55,7 @@ export function ExportDialog({ open, onOpenChange }: { open: boolean; onOpenChan
           </div>
         </div>
         <DialogFooter>
-          <span className="mono text-[11px] text-fg-dim">Design analysis from a point-mass model · not survey data or a certified assessment</span>
+          <span className="text-[11px] text-fg-dim">Design analysis from a point-mass model · not survey data or a certified assessment</span>
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -50,7 +50,7 @@ try {
   assert.equal(await evalJS<string>("document.querySelector('.chip')?.textContent?.trim()"), "Agent connected");
   // Onboarding and inspiration UI are visible without any interaction; circuit annotations render in Oxanium.
   const text0 = await evalJS<string>("document.body.innerText");
-  assert.ok(text0.includes("DESIGN LOOP") && text0.includes("DESIGN INSPIRATION") && text0.includes("Reference") && text0.includes("Formula 1"), "design loop, inspiration, reference and motorsport labels visible");
+  assert.ok(text0.includes("DESIGN LOOP") && text0.includes("DESIGN INSPIRATION") && text0.includes("FORMULA 1") && text0.includes("Change"), "design loop, inspiration and the circuit switcher visible");
   assert.match(await evalJS<string>("getComputedStyle(document.querySelector('.turn-handle text')).fontFamily"), /Oxanium/, "turn numbers use Oxanium");
   assert.doesNotMatch(await evalJS<string>("getComputedStyle(document.body).fontFamily"), /Oxanium/, "product UI keeps Geist");
 
@@ -60,7 +60,7 @@ try {
   assert.equal(res.ok, true);
   assert.ok(res.state.sectors[2].avg_speed_kmh > before.sectors[2].avg_speed_kmh, "sector 3 got faster in the live UI");
   await new Promise((r) => setTimeout(r, 300));
-  const activity = await evalJS<string>("document.body.innerText.includes('AGENT') && document.body.innerText.includes('Faster Sector 3')");
+  const activity = await evalJS<string>("document.body.innerText.includes('WEBMCP') && document.body.innerText.includes('reshape_sector') && document.body.innerText.includes('Faster Sector 3')");
   assert.ok(activity, "agent receipt visible in the panel");
   console.log("receipt:", res.receipt);
 
@@ -133,7 +133,8 @@ try {
     assert.ok(p, `${text} clickable`);
     await mouse("mousePressed", p!.x, p!.y); await mouse("mouseReleased", p!.x, p!.y); await new Promise((r) => setTimeout(r, 350));
   };
-  await clickText("header button", "Reference");
+  assert.match(await evalJS<string>("document.body.innerText"), /WEBMCP[\s\S]*#[0-9A-F]{4}/, "activity shows a WebMCP call with a local event id");
+  await clickText("aside button[aria-haspopup=dialog]", "Formula 1");
   assert.equal(await evalJS<string>("document.querySelector('[data-slot=dialog-title]')?.textContent"), "Reference Library", "library opens");
   await clickText("[data-slot=tabs-trigger]", "MotoGP");
   await new Promise((r) => setTimeout(r, 600));

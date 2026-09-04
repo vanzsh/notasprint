@@ -4,7 +4,7 @@ import { deleteTurn, setLocks } from "@/lib/moves";
 import { seriesById } from "@/lib/series";
 import { commit, getState, hydrate, redo, select, undo, useStore } from "@/lib/store";
 import { registerWebMCP } from "@/lib/webmcp";
-import { Download, LibraryBig, Presentation, Redo2, Undo2 } from "lucide-react";
+import { Redo2, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -59,13 +59,6 @@ export function Workspace() {
           <span className="label hidden lg:inline">Circuit Design Lab</span>
         </div>
         <Separator orientation="vertical" className="h-4" />
-        <div className="flex items-center gap-2.5">
-          <Tooltip>
-            <TooltipTrigger asChild><Button onClick={() => setLibrary(true)} aria-haspopup="dialog"><LibraryBig />Reference</Button></TooltipTrigger>
-            <TooltipContent>Reference Library: three layouts per motorsport, or generate a custom concept.</TooltipContent>
-          </Tooltip>
-          <span className="mono hidden text-[11px] text-fg-muted md:inline"><span className="text-fg">{series.name}</span> · {circuit.name}</span>
-        </div>
         <div className="flex items-center">
           <Tooltip>
             <TooltipTrigger asChild><Button size="icon" className="rounded-r-none" onClick={() => undo()} disabled={!canUndo} aria-label="Undo"><Undo2 /></Button></TooltipTrigger>
@@ -77,6 +70,7 @@ export function Workspace() {
           </Tooltip>
         </div>
         <div className="ml-auto flex items-center gap-3">
+          <span className="hidden text-[12px] text-fg-dim md:inline">{series.name} · {circuit.name}</span>
           <Tooltip>
             <TooltipTrigger asChild>
               <span className="chip" tabIndex={0}>
@@ -86,20 +80,13 @@ export function Workspace() {
             </TooltipTrigger>
             <TooltipContent side="bottom" align="end">{AGENT_TEXT[agent].tip}</TooltipContent>
           </Tooltip>
-          <div className="flex items-center gap-1">
-            <Tooltip>
-              <TooltipTrigger asChild><Button size="icon" onClick={() => setPresent(true)} aria-label="Presentation view"><Presentation /></Button></TooltipTrigger>
-              <TooltipContent>Presentation view: circuit and headline metrics, full screen.</TooltipContent>
-            </Tooltip>
-            <Button onClick={() => setExporting(true)} aria-haspopup="dialog"><Download />Export</Button>
-          </div>
         </div>
       </header>
       <main className="grid min-h-0 grid-cols-[1fr_minmax(320px,min(26%,400px))]">
         <div className="relative min-w-0 overflow-hidden">
           <Canvas />
         </div>
-        <Panel />
+        <Panel onLibrary={() => setLibrary(true)} onExport={() => setExporting(true)} onPresent={() => setPresent(true)} />
       </main>
       <ReferenceLibrary open={library} onOpenChange={setLibrary} />
       <ExportDialog open={exporting} onOpenChange={setExporting} />

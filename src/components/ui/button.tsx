@@ -17,6 +17,7 @@ const buttonVariants = cva(
         primary: "border-fg bg-fg text-bg hover:border-white hover:bg-white",
         ghost: "border-transparent bg-transparent text-fg-muted hover:bg-surface-2 hover:text-fg aria-expanded:bg-surface-2 aria-expanded:text-fg disabled:bg-transparent disabled:border-transparent data-[on=true]:text-accent",
         link: "h-auto rounded-none border-0 bg-transparent px-0 text-fg-muted underline decoration-line-strong underline-offset-2 hover:text-fg disabled:bg-transparent data-[on=true]:text-fg",
+        destructive: "border-accent/60 bg-surface-2 text-accent hover:border-accent hover:bg-accent-dim",
       },
       size: {
         default: "h-7 px-2.5 text-[12px]",

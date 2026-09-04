@@ -1,19 +1,30 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Maximize, Minus, Plus } from "lucide-react";
 import { buildGeometry, fingerprint, startFinish, type Circuit } from "@/lib/circuit";
 import { insertTurnOnSegment, moveTurn } from "@/lib/moves";
 import { commit, preview, select, useStore } from "@/lib/store";
+import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { SimCars } from "./SimCars";
 
 const PAD = 0.14;
+const ZOOM = { min: 0.75, max: 3, step: 1.25 }; // deliberately limited: a closer look, never a lost circuit
 const f = (n: number) => Math.round(n * 100) / 100; // stable across server/client float formatting
 
-function fitViewBox(b: { minX: number; minY: number; maxX: number; maxY: number }, size: { w: number; h: number }) {
+type Box = { minX: number; minY: number; maxX: number; maxY: number };
+type View = { z: number; dx: number; dy: number }; // zoom about the fitted view and a pan offset in metres
+const FIT: View = { z: 1, dx: 0, dy: 0 };
+
+/** The fitted view (z = 1) with ~14 % margin, then zoomed and panned; the pan is clamped so the circuit stays in frame. */
+function viewBox(b: Box, size: { w: number; h: number }, v: View) {
   const w = b.maxX - b.minX, h = b.maxY - b.minY;
   const aspect = size.w / size.h;
   let vw = w * (1 + 2 * PAD), vh = h * (1 + 2 * PAD);
   if (vw / vh < aspect) vw = vh * aspect; else vh = vw / aspect;
-  return `${(b.minX + w / 2 - vw / 2).toFixed(1)} ${(b.minY + h / 2 - vh / 2).toFixed(1)} ${vw.toFixed(1)} ${vh.toFixed(1)}`;
+  vw /= v.z; vh /= v.z;
+  const cx = b.minX + w / 2 + Math.max(-w / 2, Math.min(w / 2, v.dx)), cy = b.minY + h / 2 + Math.max(-h / 2, Math.min(h / 2, v.dy));
+  return `${(cx - vw / 2).toFixed(1)} ${(cy - vh / 2).toFixed(1)} ${vw.toFixed(1)} ${vh.toFixed(1)}`;
 }
 
 export function Canvas() {
@@ -30,6 +41,9 @@ export function Canvas() {
   const [size, setSize] = useState({ w: 1200, h: 800 });
   const drag = useRef<{ id: string; start: Circuit; moved: boolean; from: { x: number; y: number }; vertex: { x: number; y: number } } | null>(null);
   const [frozen, setFrozen] = useState<string | null>(null);
+  const [view, setView] = useState<View & { id: string }>({ ...FIT, id: circuit.id });
+  const v = view.id === circuit.id ? view : FIT; // a new circuit always opens fitted
+  const isFit = v.z === 1 && v.dx === 0 && v.dy === 0;
 
   useEffect(() => {
     const el = svgRef.current?.parentElement;
@@ -40,9 +54,31 @@ export function Canvas() {
   }, []);
 
   // Fit the circuit with generous margin; frozen while dragging so the world doesn't move under the cursor.
-  const viewBox = frozen ?? fitViewBox(g.bounds, size);
-  const [vx, vy, vw, vh] = viewBox.split(" ").map(Number);
+  const box = frozen ?? viewBox(g.bounds, size, v);
+  const [vx, vy, vw, vh] = box.split(" ").map(Number);
   const px = vw / size.w; // world metres per screen pixel
+
+  // Zoom about a world point (the cursor, or the view centre for the buttons), clamped to the limited range.
+  const zoomTo = (z: number, at?: { x: number; y: number }) => {
+    const nz = Math.max(ZOOM.min, Math.min(ZOOM.max, z));
+    const cx = vx + vw / 2, cy = vy + vh / 2, k = v.z / nz;
+    const ncx = at ? at.x - (at.x - cx) * k : cx, ncy = at ? at.y - (at.y - cy) * k : cy;
+    const bw = g.bounds.maxX - g.bounds.minX, bh = g.bounds.maxY - g.bounds.minY;
+    setView({ id: circuit.id, z: nz, dx: ncx - (g.bounds.minX + bw / 2), dy: ncy - (g.bounds.minY + bh / 2) });
+  };
+  const fit = () => setView({ ...FIT, id: circuit.id });
+  useEffect(() => {
+    // Wheel / pinch zooms at the cursor. Registered natively so the page never scrolls behind the canvas.
+    const el = svgRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const m = el.getScreenCTM()!.inverse(), p = new DOMPoint(e.clientX, e.clientY).matrixTransform(m);
+      zoomTo(v.z * Math.exp(-(e.ctrlKey ? e.deltaY * 0.01 : e.deltaY * 0.0025)), { x: p.x, y: p.y });
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  });
 
   const toWorld = (e: React.PointerEvent | React.MouseEvent) => {
     const m = svgRef.current!.getScreenCTM()!.inverse();
@@ -57,7 +93,7 @@ export function Canvas() {
     (e.currentTarget as Element).setPointerCapture(e.pointerId);
     const t = circuit.turns.find((x) => x.id === id)!;
     drag.current = { id, start: circuit, moved: false, from: toWorld(e), vertex: { x: t.x, y: t.y } };
-    setFrozen(viewBox);
+    setFrozen(box);
   };
   const onMove = (e: React.PointerEvent) => {
     if (!drag.current) return;
@@ -101,10 +137,11 @@ export function Canvas() {
   const gridMinor = 100, gridMajor = 500;
 
   return (
+    <>
     <svg
       ref={svgRef}
       className="h-full w-full select-none touch-none"
-      viewBox={viewBox}
+      viewBox={box}
       onPointerMove={onMove}
       onPointerUp={onUp}
       onPointerCancel={onUp}
@@ -191,5 +228,15 @@ export function Canvas() {
       {/* Simulated cars on this circuit's own centreline; hidden once the geometry no longer matches the run */}
       {simulation && simulation.fingerprint === fingerprint(circuit) && <SimCars result={simulation} run={simRun} g={g} px={px} view={{ x: vx, y: vy, w: vw, h: vh }} series={circuit.series} />}
     </svg>
+    {/* Workspace zoom: a closer look at a corner, then straight back to Fit. */}
+    <div className="absolute top-3 left-3 flex flex-col items-start gap-1">
+      <div className="flex flex-col">
+        <Tooltip><TooltipTrigger asChild><Button size="icon" className="rounded-b-none" onClick={() => zoomTo(v.z * ZOOM.step)} disabled={v.z >= ZOOM.max} aria-label="Zoom in"><Plus /></Button></TooltipTrigger><TooltipContent side="right">Zoom in · scroll or pinch on the canvas</TooltipContent></Tooltip>
+        <Tooltip><TooltipTrigger asChild><Button size="icon" className="-mt-px rounded-none" onClick={() => zoomTo(v.z / ZOOM.step)} disabled={v.z <= ZOOM.min} aria-label="Zoom out"><Minus /></Button></TooltipTrigger><TooltipContent side="right">Zoom out</TooltipContent></Tooltip>
+        <Tooltip><TooltipTrigger asChild><Button size="icon" className="-mt-px rounded-t-none" onClick={fit} disabled={isFit} aria-label="Fit circuit"><Maximize /></Button></TooltipTrigger><TooltipContent side="right">Fit the whole circuit</TooltipContent></Tooltip>
+      </div>
+      {!isFit && <span className="mono pl-0.5 text-[10px] text-fg-dim">{Math.round(v.z * 100)}%</span>}
+    </div>
+    </>
   );
 }

@@ -1,20 +1,23 @@
 "use client";
-import { useRef, useState } from "react";
-import { ChevronRight, Lock, LockOpen, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import Image from "next/image";
+import { ArrowLeftRight, ChevronDown, ChevronRight, Download, Lock, LockOpen, Plus, Presentation, RefreshCw, RotateCcw, Trash2 } from "lucide-react";
 import { ARCHETYPES, archetypeById, type ArchetypeId } from "@/lib/archetypes";
 import { fingerprint, fmtKm, fmtLap, type Analysis, type Circuit } from "@/lib/circuit";
 import { evaluateBrief, isBriefEmpty } from "@/lib/constraints";
 import { applyInspiration, deleteTurn, editTurns, insertTurns, setLocks, type InspirationScope } from "@/lib/moves";
 import { seriesById } from "@/lib/series";
-import { commit, getState, loadCustom, preview, SCORE_LABEL, select, undo, useStore } from "@/lib/store";
+import { commit, getState, loadCustom, preview, resetCircuit, SCORE_LABEL, select, undo, useStore, type Receipt } from "@/lib/store";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Slider } from "@/components/ui/slider";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Brief } from "./Brief";
+import { SERIES_LOGO } from "./ReferenceLibrary";
 import { Simulation } from "./Simulation";
 import { Versions } from "./Versions";
 
@@ -39,8 +42,8 @@ const TIP: Record<string, string> = {
   Character: "Sector character from average speed, slow corners and corner density.",
 };
 
-export function Panel() {
-  const { circuit, analysis: a, selected, receipt, brief, simulation, versions, compare } = useStore((s) => s);
+export function Panel({ onLibrary, onExport, onPresent }: { onLibrary: () => void; onExport: () => void; onPresent: () => void }) {
+  const { circuit, analysis: a, selected, events, brief, simulation, versions, compare } = useStore((s) => s);
   const selIdx = circuit.turns.findIndex((t) => t.id === selected);
   const turn = selIdx >= 0 ? circuit.turns[selIdx] : null;
   const ta = selIdx >= 0 ? a.turns[selIdx] : null;
@@ -49,29 +52,46 @@ export function Panel() {
   const report = evaluateBrief(brief, circuit, a);
   const simStale = simulation ? simulation.fingerprint !== fingerprint(circuit) : false;
   const scoreKeys = Object.keys(SCORE_LABEL) as (keyof typeof SCORE_LABEL)[];
+  const canReset = useStore((s) => s.circuit !== s.origin);
+  const [confirmReset, setConfirmReset] = useState(false);
+  const asideRef = useRef<HTMLElement>(null);
 
   return (
-    <aside className="flex h-full min-h-0 flex-col border-l border-line bg-surface">
-      <ScrollArea className="min-h-0 flex-1">
+    <aside ref={asideRef} className="flex h-full min-h-0 flex-col border-l border-line bg-surface">
+      <div className="relative min-h-0 flex-1">
+      <ScrollArea className="h-full">
         <Section label="Circuit" summary={`${series.short} · ${fmtKm(a.length)} km · ${a.turnCount} turns`} defaultOpen>
-          <div className="flex items-start justify-between gap-2">
-            <div className="display min-w-0 text-[28px] leading-none">{circuit.name}</div>
+          {/* The circuit identity is the switcher: one raised control, click to open the Reference Library. */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button onClick={onLibrary} aria-haspopup="dialog" className="group -mx-1 flex w-[calc(100%+8px)] flex-col gap-1.5 rounded-sm border border-line bg-surface-2 px-3 py-2.5 text-left outline-none transition-[border-color,transform,background-color] duration-120 ease-out hover:-translate-y-px hover:border-line-strong hover:bg-[#1b1b1b] focus-visible:border-fg-muted active:translate-y-0">
+                <span className="flex w-full items-center gap-2">
+                  <Image src={SERIES_LOGO[circuit.series]} alt="" width={16} height={16} unoptimized className="size-4 rounded-[2px] object-contain" />
+                  <span className="label text-fg-muted transition-colors duration-120 group-hover:text-fg">{series.name}</span>
+                  <span className="ml-auto flex items-center gap-1.5 text-[11px] text-fg-dim transition-colors duration-120 group-hover:text-fg">Change<ArrowLeftRight className="size-3.5" /></span>
+                </span>
+                <span className="display block min-w-0 text-[26px] leading-none text-fg">{circuit.name}</span>
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="left">Open the Reference Library: three layouts per motorsport, or a new custom concept.</TooltipContent>
+          </Tooltip>
+          <div className="mt-2.5 text-[12px] leading-snug text-fg-muted">{circuit.tagline}</div>
+          <div className="mt-1 flex items-center gap-2 text-[12px] text-fg-dim">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="cursor-help truncate">
+                  {circuit.custom !== undefined ? <>Generated concept · <span className="mono">seed {circuit.custom}</span></> : circuit.location ? <>{circuit.location} · Reference</> : "NotASprint original"}{example ? ` · ${example} example` : ""}
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="left">Scores, warnings and the simulation use the {series.name} vehicle model: {Math.round(series.vehicle.vMax * 3.6)} km/h, {(series.vehicle.aLat / 9.81).toFixed(1)} g lateral. Reference layouts are schematic starting points; design inspirations are characteristics applied to the live circuit.</TooltipContent>
+            </Tooltip>
             {circuit.custom !== undefined && (
               <Tooltip>
-                <TooltipTrigger asChild><Button variant="ghost" size="icon-sm" className="mt-0.5 shrink-0" onClick={() => loadCustom(circuit.series)} aria-label="Create another concept"><RefreshCw /></Button></TooltipTrigger>
-                <TooltipContent side="left">Create another {series.name} concept. This one is seed {circuit.custom}; the agent can reproduce it.</TooltipContent>
+                <TooltipTrigger asChild><Button variant="ghost" size="icon-sm" className="ml-auto shrink-0" onClick={() => loadCustom(circuit.series)} aria-label="Create another concept"><RefreshCw /></Button></TooltipTrigger>
+                <TooltipContent side="left">Create another {series.name} concept. The agent can reproduce this one from its seed.</TooltipContent>
               </Tooltip>
             )}
           </div>
-          <div className="mt-1 truncate text-[12px] text-fg-muted" title={circuit.tagline}>{circuit.tagline}</div>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div className="mono mt-1 w-fit cursor-help truncate text-[11px] text-fg-dim">
-                <span className="text-fg-muted">{series.name}</span> · {circuit.custom !== undefined ? `Generated concept · seed ${circuit.custom}` : circuit.location ? `Reference · ${circuit.location}` : "NotASprint original"}{example ? ` · ${example} example` : ""}
-              </div>
-            </TooltipTrigger>
-            <TooltipContent side="left">Scores, warnings and the simulation use the {series.name} vehicle model: {Math.round(series.vehicle.vMax * 3.6)} km/h, {(series.vehicle.aLat / 9.81).toFixed(1)} g lateral. Reference layouts are schematic starting points; design inspirations are characteristics applied to the live circuit.</TooltipContent>
-          </Tooltip>
           <div className="mt-3 flex items-end gap-6">
             <Hero value={fmtKm(a.length)} unit="km" label="Length" />
             <Hero value={fmtLap(a.lapTime)} unit="" label="Est. lap" />
@@ -109,7 +129,7 @@ export function Panel() {
               {a.sectors.map((s) => (
                 <tr key={s.sector} className="border-t border-line">
                   <td className="display py-1 text-[15px] leading-none text-fg">S{s.sector}</td>
-                  <td className="py-1 text-fg-muted">{s.character}</td>
+                  <td className="py-1 font-sans text-[12px] text-fg-muted">{s.character}</td>
                   <td className="py-1 text-right text-fg-muted">{s.turns}</td>
                   <td className="py-1 text-right text-fg-muted">{s.length} <span className="text-fg-dim">m</span></td>
                   <td className="py-1 text-right text-fg">{s.avgSpeed} <span className="text-fg-dim">km/h</span></td>
@@ -122,9 +142,9 @@ export function Panel() {
         <Section label="Overtaking" summary={`${a.overtakingOpportunities.length} strong`}>
           {a.overtakingOpportunities.length === 0 && <div className="text-[12px] text-fg-dim">No strong braking zone yet. A heavy stop after a long straight creates one.</div>}
           {a.overtakingOpportunities.map((t) => (
-            <button key={t.id} onClick={() => select(t.id)} className={cn("mono -mx-2 flex h-6 w-[calc(100%+16px)] items-center justify-between gap-2 rounded-sm px-2 text-left text-[11px] hover:bg-surface-2", t.id === selected && "bg-surface-2")}>
-              <span className="text-fg"><span className="text-accent">▸</span> T{t.turn}{t.name ? <span className="text-fg-muted"> {t.name}</span> : null}</span>
-              <span className="text-fg-muted">{t.entrySpeed}<span className="text-fg-dim">→</span>{t.apexSpeed} <span className="text-fg-dim">km/h</span> · {t.approach} <span className="text-fg-dim">m</span></span>
+            <button key={t.id} onClick={() => select(t.id)} className={cn("-mx-2 flex h-6 w-[calc(100%+16px)] items-center justify-between gap-2 rounded-sm px-2 text-left text-[12px] hover:bg-surface-2", t.id === selected && "bg-surface-2")}>
+              <span className="text-fg"><span className="text-accent">▸</span> <span className="mono text-[11px]">T{t.turn}</span>{t.name ? <span className="text-fg-muted"> {t.name}</span> : null}</span>
+              <span className="mono text-[11px] text-fg-muted">{t.entrySpeed}<span className="text-fg-dim">→</span>{t.apexSpeed} <span className="text-fg-dim">km/h</span> · {t.approach} <span className="text-fg-dim">m</span></span>
             </button>
           ))}
         </Section>
@@ -154,24 +174,107 @@ export function Panel() {
             {a.warnings.map((w, i) => <div key={i} className="py-0.5 text-[12px] text-fg-muted before:mr-2 before:text-accent before:content-['!']">{w}</div>)}
           </Section>
         )}
+
+        <Section label="Workspace" summary="Export · Present · Reset">
+          <div className="grid grid-cols-3 gap-1">
+            <Button onClick={onExport} aria-haspopup="dialog"><Download />Export</Button>
+            <Button onClick={onPresent}><Presentation />Present</Button>
+            <Button onClick={() => setConfirmReset(true)} disabled={!canReset} aria-haspopup="dialog"><RotateCcw />Reset</Button>
+          </div>
+          <p className="mt-2 text-[11px] leading-snug text-fg-dim">Export drawings and data, show the circuit full screen, or return this circuit to the layout it was loaded or generated with.</p>
+        </Section>
       </ScrollArea>
+      <MoreBelow root={asideRef} />
+      </div>
 
       <div className="border-t border-line px-4 py-2.5">
-        <div className="label mb-1.5">Activity</div>
-        {receipt ? (
-          <div key={receipt.at} className="mono text-[11px] text-fg-muted">
-            <div className="flex items-baseline gap-2">
-              <span className={cn("shrink-0 tracking-[0.06em]", receipt.source === "agent" ? "text-fg" : "text-fg-dim")}>{receipt.source === "agent" ? "AGENT" : "YOU"}</span>
-              <span className="tick min-w-0 flex-1 truncate text-fg" title={receipt.label ?? receipt.text}>{receipt.label ?? receipt.text}</span>
-              <Button variant="link" className="shrink-0 text-[11px]" onClick={() => undo()}>Undo</Button>
-            </div>
-            {receipt.label && receipt.text && <div className="mt-0.5 truncate pl-[calc(5ch+8px)]" title={receipt.text}>{receipt.text}</div>}
-          </div>
+        <div className="mb-1.5 flex items-baseline justify-between">
+          <span className="label">Activity</span>
+          {events.length > 0 && <Button variant="link" className="text-[11px]" onClick={() => undo()}>Undo last change</Button>}
+        </div>
+        {events.length ? (
+          <div className="space-y-1.5">{events.slice(0, 3).map((e, i) => <Event key={e.id} e={e} latest={i === 0} />)}</div>
         ) : (
-          <div className="mono text-[11px] text-fg-dim">No changes yet · ⌘Z undo · ⇧⌘Z redo</div>
+          <div className="text-[12px] text-fg-dim">No changes yet. Agent tool calls and your edits are recorded here · <kbd className="mono text-fg-muted">⌘Z</kbd> undo</div>
         )}
       </div>
+
+      <Dialog open={confirmReset} onOpenChange={setConfirmReset}>
+        <DialogContent className="max-w-[420px]" showCloseButton={false}>
+          <DialogHeader className="flex-col gap-1.5">
+            <DialogTitle>Reset circuit?</DialogTitle>
+            <DialogDescription>This discards the changes made to {circuit.name} and restores the layout it was {circuit.custom !== undefined ? "generated" : "loaded"} with. The reset itself can be undone.</DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="justify-end">
+            <Button variant="ghost" onClick={() => setConfirmReset(false)}>Cancel</Button>
+            <Button variant="destructive" onClick={() => { resetCircuit(); setConfirmReset(false); }}>Reset circuit</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </aside>
+  );
+}
+
+/** One activity record. WebMCP calls show the tool, its outcome, the time and a local event id — real data only. */
+function Event({ e, latest }: { e: Receipt; latest: boolean }) {
+  const time = new Date(e.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" });
+  const agent = e.source === "agent";
+  const headline = e.tool ? e.tool : (e.label ?? e.text);
+  const detail = e.tool ? [e.label, e.text].filter(Boolean).join(" · ") : e.label ? e.text : "";
+  return (
+    <div className={cn("text-[11px]", latest ? "text-fg-muted" : "text-fg-dim")}>
+      <div className="flex items-baseline gap-2">
+        <span className={cn("label shrink-0 text-[10px]", agent ? (latest ? "text-fg" : "text-fg-muted") : "text-fg-dim")}>{agent ? "WebMCP" : "You"}</span>
+        <span className={cn("min-w-0 flex-1 truncate", e.tool && "mono", latest ? "text-fg" : "text-fg-muted", latest && "tick")} title={headline}>{headline}</span>
+        {e.tool && <span className={cn("label shrink-0 text-[10px]", e.ok ? "text-fg-muted" : "text-accent")}>{e.ok ? "success" : "refused"}</span>}
+        <span className="mono shrink-0 text-[10px] text-fg-dim">{time}</span>
+        <span className="mono shrink-0 text-[10px] text-fg-dim">{e.id}</span>
+      </div>
+      {detail && <div className="mt-0.5 truncate pl-[calc(6ch+8px)]" title={detail}>{detail}</div>}
+    </div>
+  );
+}
+
+/**
+ * Sticky bottom indicator for the scrolling rail: a soft fade and a chevron whenever content sits below the fold. If a
+ * flagged section (failing brief, stale simulation, geometry warnings) is out of view, it turns into a red count and the
+ * click jumps to the first one; otherwise it scrolls on by most of a viewport.
+ */
+function MoreBelow({ root }: { root: React.RefObject<HTMLElement | null> }) {
+  const [state, setState] = useState<{ more: boolean; flags: number }>({ more: false, flags: 0 });
+  const vp = () => root.current?.querySelector<HTMLElement>("[data-slot=scroll-area-viewport]") ?? null;
+  const hiddenFlags = () => { const v = vp(); if (!v) return []; const bottom = v.getBoundingClientRect().bottom; return [...v.querySelectorAll<HTMLElement>("[data-flag]")].filter((el) => el.getBoundingClientRect().top > bottom - 12); };
+  const measure = () => {
+    const v = vp();
+    if (!v) return;
+    const next = { more: v.scrollTop + v.clientHeight < v.scrollHeight - 8, flags: hiddenFlags().length };
+    setState((s) => (s.more === next.more && s.flags === next.flags ? s : next));
+  };
+  useEffect(() => {
+    const v = vp();
+    if (!v) return;
+    const raf = requestAnimationFrame(measure);
+    v.addEventListener("scroll", measure, { passive: true });
+    const ro = new ResizeObserver(measure);
+    ro.observe(v); if (v.firstElementChild) ro.observe(v.firstElementChild);
+    const mo = new MutationObserver(measure);
+    mo.observe(v, { childList: true, subtree: true, attributes: true, attributeFilter: ["data-state", "data-flag"] });
+    return () => { cancelAnimationFrame(raf); v.removeEventListener("scroll", measure); ro.disconnect(); mo.disconnect(); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- measures the DOM; re-subscribing per render is unnecessary
+  }, []);
+  if (!state.more) return null;
+  const go = () => {
+    const v = vp(), target = hiddenFlags()[0];
+    if (target) target.scrollIntoView({ block: "start", behavior: "smooth" });
+    else v?.scrollBy({ top: v.clientHeight * 0.75, behavior: "smooth" });
+  };
+  return (
+    <div className="pointer-events-none absolute inset-x-0 bottom-0 flex h-12 items-end justify-center bg-gradient-to-t from-surface to-transparent pb-1.5">
+      <button onClick={go} className={cn("pointer-events-auto inline-flex h-6 items-center gap-1 rounded-sm border bg-surface px-1.5 text-[11px] outline-none transition-colors duration-120 hover:border-line-strong hover:text-fg focus-visible:border-fg-muted", state.flags ? "border-accent/60 text-accent hover:border-accent" : "border-line text-fg-muted")} aria-label={state.flags ? `${state.flags} item${state.flags === 1 ? " below needs" : "s below need"} attention` : "More below"}>
+        <ChevronDown className="size-3.5" />
+        {state.flags > 0 && <span className="mono pr-0.5 text-[10px]">{state.flags === 1 ? "!" : state.flags}</span>}
+      </button>
+    </div>
   );
 }
 
@@ -196,7 +299,7 @@ function Inspector({ i }: { i: number }) {
     <div className="space-y-3">
       <div className="flex items-baseline justify-between gap-3">
         <div className="display text-[15px] leading-none text-fg">{ta.type} · {ta.direction === "L" ? "Left" : "Right"} {ta.angle}°</div>
-        <span className="mono text-[11px] text-fg-muted">S{t.sector} · {Math.round(t.x)}, {Math.round(t.y)}</span>
+        <span className="text-[11px] text-fg-muted">S{t.sector} · <span className="mono">{Math.round(t.x)}, {Math.round(t.y)}</span></span>
       </div>
       <div className="grid grid-cols-3 gap-x-4 gap-y-2 border-y border-line py-2">
         <Metric k="Apex" v={ta.apexSpeed} unit="km/h" />
@@ -245,14 +348,14 @@ function DesignLoop() {
   return (
     <div className="space-y-1.5">
       <div className="display text-[15px] text-fg">Drag → Lock → Ask agent → Continue</div>
-      <ol className="mono space-y-0.5 text-[11px] text-fg-muted">
-        <li><span className="text-fg">Drag</span> · click to inspect · double-click to add</li>
-        <li><span className="text-fg">L</span> locks a turn — no tool can move or delete it</li>
-        <li><span className="text-fg">Ask</span> the agent — it edits this live circuit</li>
-        <li><span className="text-fg">⌘Z</span> undo · ⇧⌘Z redo · Export JSON / SVG</li>
+      <ol className="space-y-0.5 text-[12px] leading-snug text-fg-muted [&_kbd]:mono [&_kbd]:text-fg">
+        <li><span className="text-fg">Drag</span> to move · click to inspect · double-click to add</li>
+        <li><kbd>L</kbd> locks a turn — no tool can move or delete it</li>
+        <li><span className="text-fg">Ask</span> the agent — it edits this live circuit, not a copy</li>
+        <li><kbd>⌘Z</kbd> undo · <kbd>⇧⌘Z</kbd> redo</li>
       </ol>
-      <div className="mono text-[11px] text-fg-dim">
-        {agent === "connected" ? "Agent connected · tool calls edit this circuit" : agent === "unavailable" ? "No WebMCP agent detected · use the ChatGPT desktop browser or Chrome 149+ with chrome://flags/#enable-webmcp-testing" : "Checking for a WebMCP agent"}
+      <div className="text-[12px] text-fg-dim">
+        {agent === "connected" ? "Agent connected · tool calls edit this circuit" : agent === "unavailable" ? <>No WebMCP agent detected · use the ChatGPT desktop browser or Chrome 149+ with <span className="mono">chrome://flags/#enable-webmcp-testing</span></> : "Checking for a WebMCP agent"}
       </div>
     </div>
   );
@@ -277,11 +380,11 @@ function Inspiration() {
           <Collapsible key={a.id} open={isOpen} onOpenChange={(o) => setOpen(o ? a.id : null)} className={k ? "border-t border-line" : ""}>
             <CollapsibleTrigger className="group block w-full py-2 text-left">
               <div className={cn("display text-[15px] leading-none transition-colors duration-120 group-hover:text-fg", isOpen ? "text-fg" : "text-fg-muted")}>{a.name}</div>
-              <div className={cn("mono mt-1 text-[11px]", isOpen ? "leading-relaxed text-fg-muted" : "text-fg-dim")}>{isOpen ? a.traits.join(" · ") : a.summary}</div>
+              <div className={cn("mt-1 text-[12px]", isOpen ? "leading-relaxed text-fg-muted" : "text-fg-dim")}>{isOpen ? a.traits.join(" · ") : a.summary}</div>
             </CollapsibleTrigger>
             <CollapsibleContent className="overflow-hidden data-[state=open]:animate-collapse-down data-[state=closed]:animate-collapse-up">
               <div className="space-y-2 pb-3">
-                <div className="text-[12px] text-fg-muted">Ask the agent <span className="mono text-fg">“{a.examplePrompt}”</span></div>
+                <div className="text-[12px] text-fg-muted">Ask the agent <span className="text-fg">“{a.examplePrompt}”</span></div>
                 <div className="flex items-center gap-1">
                   <span className="label mr-1">Apply to</span>
                   {([1, 2, 3, "circuit"] as InspirationScope[]).map((s, n) => (
@@ -293,7 +396,7 @@ function Inspiration() {
           </Collapsible>
         );
       })}
-      {note && <div className="mono mt-2 text-[11px] text-fg-muted before:mr-2 before:text-accent before:content-['!']">{note}</div>}
+      {note && <div className="mt-2 text-[12px] text-fg-muted before:mr-2 before:text-accent before:content-['!']">{note}</div>}
     </div>
   );
 }
@@ -313,7 +416,7 @@ function Section({ label, summary, flag, defaultOpen = false, autoOpen = false, 
   const [manual, setManual] = useState<boolean | null>(null);
   const open = manual ?? (defaultOpen || autoOpen);
   return (
-    <Collapsible open={open} onOpenChange={setManual} className="border-b border-line">
+    <Collapsible open={open} onOpenChange={setManual} className="border-b border-line" data-flag={flag ? "" : undefined}>
       <CollapsibleTrigger className="group flex h-8 w-full items-center gap-2 px-4 text-left outline-none transition-colors duration-120 hover:bg-surface-2 focus-visible:bg-surface-2">
         <ChevronRight className="size-3 shrink-0 text-fg-dim transition-transform duration-120 ease-out group-data-[state=open]:rotate-90" />
         <span className="label shrink-0 transition-colors duration-120 group-hover:text-fg group-data-[state=open]:text-fg">{label}</span>

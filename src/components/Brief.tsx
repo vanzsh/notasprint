@@ -56,7 +56,7 @@ export function Brief() {
           </SelectContent>
         </Select>
       </Row>
-      <div className="mono flex min-h-6 flex-wrap items-center gap-1.5 text-[11px]">
+      <div className="flex min-h-6 flex-wrap items-center gap-1.5 text-[12px]">
         <span className="w-[104px] shrink-0 text-fg-muted">Preserve</span>
         {preserved.map((id) => {
           const i = circuit.turns.findIndex((t) => t.id === id), r = report.results.find((x) => x.key === "preserve" && x.turnId === id);
@@ -67,10 +67,10 @@ export function Brief() {
           );
         })}
         {selIdx >= 0 && !preserved.includes(selected!) && <Button size="sm" onClick={() => preserve(selected!, true)}>+ T{selIdx + 1}</Button>}
-        {!preserved.length && selIdx < 0 && <span className="text-fg-dim">select a turn to preserve it</span>}
+        {!preserved.length && selIdx < 0 && <span className="text-fg-dim">Select a turn to preserve it</span>}
       </div>
-      <div className="mono flex items-center justify-between pt-1 text-[11px] text-fg-muted">
-        <span>{isBriefEmpty(brief) ? "No constraints set · design checks, not certification" : <>{report.passed}/{report.active} pass{report.failed.length ? <span className="text-accent"> · {report.failed.length} failing</span> : null}</>}</span>
+      <div className="flex items-center justify-between pt-1 text-[12px] text-fg-muted">
+        <span>{isBriefEmpty(brief) ? "No constraints set · design checks, not certification" : <><span className="mono">{report.passed}/{report.active}</span> pass{report.failed.length ? <span className="text-accent"> · {report.failed.length} failing</span> : null}</>}</span>
         {!isBriefEmpty(brief) && <Button variant="link" className="text-[11px]" onClick={() => clearBrief()}>Clear</Button>}
       </div>
     </div>
@@ -79,13 +79,13 @@ export function Brief() {
 
 function Row({ on, onToggle, label, result, children }: { on: boolean; onToggle: () => void; label: string; result?: { status: ConstraintStatus; actual: string }; children: React.ReactNode }) {
   return (
-    <div className="mono flex h-6 items-center gap-1.5 text-[11px]">
+    <div className="flex h-6 items-center gap-1.5 text-[12px]">
       <label className="flex w-[104px] shrink-0 cursor-pointer items-center gap-2 whitespace-nowrap text-fg-muted"><Checkbox checked={on} onCheckedChange={onToggle} />{label}</label>
-      <div className={cn("flex items-center gap-1", !on && "opacity-40")}>{children}</div>
+      <div className={cn("mono flex items-center gap-1 text-[11px]", !on && "opacity-40")}>{children}</div>
       {on && result && (
         <div className="ml-auto flex min-w-0 items-baseline gap-2 whitespace-nowrap">
-          <span className="truncate text-fg-muted" title={result.actual}>{result.actual}</span>
-          <span className={cn("shrink-0", STATUS[result.status].cls)}>{STATUS[result.status].text}</span>
+          <span className="mono truncate text-[11px] text-fg-muted" title={result.actual}>{result.actual}</span>
+          <span className={cn("label shrink-0 text-[10px]", STATUS[result.status].cls)}>{STATUS[result.status].text}</span>
         </div>
       )}
     </div>

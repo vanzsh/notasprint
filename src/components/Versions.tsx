@@ -33,7 +33,7 @@ export function Versions() {
       </div>
       {!versions.length && <div className="text-[12px] text-fg-dim">Save a milestone to compare designs later. Undo stays separate for small edits.</div>}
       {versions.map((v) => (
-        <div key={v.id} className={cn("mono -mx-2 rounded-sm px-2 py-1 text-[11px]", compare === v.id && "bg-surface-2")}>
+        <div key={v.id} className={cn("-mx-2 rounded-sm px-2 py-1 text-[12px]", compare === v.id && "bg-surface-2")}>
           <div className="flex items-center gap-2">
             <span className="display w-[2.4ch] shrink-0 text-[15px] leading-none text-fg">{v.id.toUpperCase()}</span>
             <span className="min-w-0 flex-1 truncate text-fg" title={`${v.name} · saved ${time(v.at)} by ${v.source}`}>{v.name}</span>
@@ -41,13 +41,13 @@ export function Versions() {
             <Button variant="link" className="text-[11px]" onClick={() => restoreVersion(v.id)}>Restore</Button>
             <Button variant="ghost" size="icon-sm" onClick={() => deleteVersion(v.id)} aria-label={`Delete ${v.id.toUpperCase()}`}><X className="size-3" /></Button>
           </div>
-          <div className="truncate pl-[calc(2.4ch+8px)] text-fg-dim">{(v.analysis.length / 1000).toFixed(2)} km · {v.analysis.turnCount} turns · {v.analysis.overtakingOpportunities.length} strong{v.simulation ? ` · sim ${v.simulation.totals.congestion} held up · ${v.simulation.totals.overtakes} passes` : " · no simulation"}</div>
+          <div className="mono truncate pl-[calc(2.4ch+8px)] text-[11px] text-fg-dim">{(v.analysis.length / 1000).toFixed(2)} km · {v.analysis.turnCount} turns · {v.analysis.overtakingOpportunities.length} strong{v.simulation ? ` · sim ${v.simulation.totals.congestion} held up · ${v.simulation.totals.overtakes} passes` : " · no simulation"}</div>
         </div>
       ))}
       {cmp && target && (
         <div className="border-t border-line pt-2">
-          <div className="mono mb-1 flex items-center justify-between text-[11px]">
-            <span className="text-fg-muted"><span className="text-fg">{target.id.toUpperCase()}</span> → <span className="text-fg">CURRENT</span> · dashed on canvas</span>
+          <div className="mb-1 flex items-center justify-between text-[12px]">
+            <span className="text-fg-muted"><span className="display text-[13px] text-fg">{target.id.toUpperCase()}</span> → <span className="display text-[13px] text-fg">Current</span> · dashed on the canvas</span>
             <Button variant="link" className="text-[11px]" onClick={() => setCompare(null)}>Close</Button>
           </div>
           <table className="mono w-full text-[11px]">
@@ -70,7 +70,7 @@ export function Versions() {
               ))}
             </tbody>
           </table>
-          {!cmp.simulation && <div className="mono mt-1 text-[11px] text-fg-dim">Run a simulation on both to compare race-flow signals</div>}
+          {!cmp.simulation && <div className="mt-1 text-[11px] text-fg-dim">Run a simulation on both to compare race-flow signals</div>}
         </div>
       )}
     </div>
