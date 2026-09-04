@@ -21,7 +21,7 @@ export function ExportDialog({ open, onOpenChange }: { open: boolean; onOpenChan
   };
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[920px]">
+      <DialogContent className="max-w-[920px] rounded-xl">
         <DialogHeader>
           <DialogTitle>Export</DialogTitle>
           <DialogDescription>{circuit.name} · drawings are 2400 px wide; JSON carries the definition and analysis.</DialogDescription>

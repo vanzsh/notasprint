@@ -55,16 +55,18 @@ export function Panel({ onLibrary, onExport, onPresent }: { onLibrary: () => voi
   const canReset = useStore((s) => s.circuit !== s.origin);
   const [confirmReset, setConfirmReset] = useState(false);
   const asideRef = useRef<HTMLElement>(null);
+  // Attention that must survive collapsing: failing constraints and geometry warnings roll up to the Design header.
+  const attention = report.failed.length + a.warnings.length;
 
   return (
     <aside ref={asideRef} className="flex h-full min-h-0 flex-col border-l border-line bg-surface">
       <div className="relative min-h-0 flex-1">
       <ScrollArea className="h-full">
-        <Section label="Circuit" summary={`${series.short} · ${fmtKm(a.length)} km · ${a.turnCount} turns`} defaultOpen>
-          {/* The circuit identity is the switcher: one raised control, click to open the Reference Library. */}
+        {/* 1 · Circuit identity — always visible; the block itself is the reference switcher. */}
+        <div className="border-b border-line px-4 pb-3 pt-3">
           <Tooltip>
             <TooltipTrigger asChild>
-              <button onClick={onLibrary} aria-haspopup="dialog" className="group -mx-1 flex w-[calc(100%+8px)] flex-col gap-1.5 rounded-sm border border-line bg-surface-2 px-3 py-2.5 text-left outline-none transition-[border-color,transform,background-color] duration-120 ease-out hover:-translate-y-px hover:border-line-strong hover:bg-[#1b1b1b] focus-visible:border-fg-muted active:translate-y-0">
+              <button onClick={onLibrary} aria-haspopup="dialog" className="group -mx-1 flex w-[calc(100%+8px)] flex-col gap-1.5 rounded-lg border border-line bg-surface-2 px-3 py-2.5 text-left outline-none transition-[border-color,transform,background-color] duration-120 ease-out hover:-translate-y-px hover:border-line-strong hover:bg-[#1b1b1b] focus-visible:border-fg-muted active:translate-y-0">
                 <span className="flex w-full items-center gap-2">
                   <Image src={SERIES_LOGO[circuit.series]} alt="" width={16} height={16} unoptimized className="size-4 rounded-[2px] object-contain" />
                   <span className="label text-fg-muted transition-colors duration-120 group-hover:text-fg">{series.name}</span>
@@ -102,19 +104,21 @@ export function Panel({ onLibrary, onExport, onPresent }: { onLibrary: () => voi
             <Metric k="Max straight" v={a.longestStraight} unit="m" />
             <Metric k="Track width" v={circuit.trackWidth} unit="m" />
           </div>
-        </Section>
+        </div>
 
-        <Section label="Design scores" summary={scoreKeys.map((k) => a.scores[k]).join(" · ")} defaultOpen>
+        {/* 2 · Design — shape and analyse. Open by default; deeper analysis is nested and collapsed. */}
+        <Section label="Design" summary={`Flow ${a.scores.flow} · ${a.overtakingOpportunities.length} overtaking`} flag={attention ? `⚠ ${attention}` : undefined} defaultOpen autoOpen={attention > 0}>
+        <Section label="Scores" level="sub" summary={scoreKeys.map((k) => a.scores[k]).join(" · ")} defaultOpen>
           <div className="grid grid-cols-4 gap-3">
             {scoreKeys.map((k) => <Score key={k} label={SCORE_LABEL[k]} value={a.scores[k]} />)}
           </div>
         </Section>
 
-        <Section key={selected ?? "loop"} label={turn ? `Turn ${selIdx + 1}` : "Design loop"} summary={ta ? `${ta.type} ${ta.direction} · ${Math.round(turn!.radius)} m` : undefined} flag={turn?.locked ? "locked" : undefined} defaultOpen>
+        <Section key={selected ?? "loop"} label={turn ? `Turn ${selIdx + 1}` : "Design loop"} level="sub" summary={ta ? `${ta.type} ${ta.direction} · ${Math.round(turn!.radius)} m` : undefined} flag={turn?.locked ? "locked" : undefined} defaultOpen>
           {turn ? <Inspector key={selected} i={selIdx} /> : <DesignLoop />}
         </Section>
 
-        <Section label="Sectors" summary={a.sectors.map((s) => s.character).join(" · ")}>
+        <Section label="Sectors" level="sub" summary={a.sectors.map((s) => s.character).join(" · ")}>
           <table className="mono w-full text-[11px]">
             <thead>
               <tr className="label text-[10px]">
@@ -139,7 +143,7 @@ export function Panel({ onLibrary, onExport, onPresent }: { onLibrary: () => voi
           </table>
         </Section>
 
-        <Section label="Overtaking" summary={`${a.overtakingOpportunities.length} strong`}>
+        <Section label="Overtaking" level="sub" summary={`${a.overtakingOpportunities.length} strong`}>
           {a.overtakingOpportunities.length === 0 && <div className="text-[12px] text-fg-dim">No strong braking zone yet. A heavy stop after a long straight creates one.</div>}
           {a.overtakingOpportunities.map((t) => (
             <button key={t.id} onClick={() => select(t.id)} className={cn("-mx-2 flex h-6 w-[calc(100%+16px)] items-center justify-between gap-2 rounded-sm px-2 text-left text-[12px] hover:bg-surface-2", t.id === selected && "bg-surface-2")}>
@@ -149,39 +153,47 @@ export function Panel({ onLibrary, onExport, onPresent }: { onLibrary: () => voi
           ))}
         </Section>
 
-        <Section label="Speed trace" summary={`${a.topSpeed} km/h max`}>
+        <Section label="Speed trace" level="sub" summary={`${a.topSpeed} km/h max`}>
           <SpeedTrace a={a} />
         </Section>
 
-        <Section label="Design inspiration" summary="3 characters">
+        <Section label="Inspiration" level="sub" summary="3 characters">
           <Inspiration />
         </Section>
 
-        <Section label="Design brief" summary={isBriefEmpty(brief) ? "No constraints" : `${report.passed}/${report.active} pass`} flag={report.failed.length ? `${report.failed.length} failing` : undefined} autoOpen={!isBriefEmpty(brief)}>
+        <Section label="Design brief" level="sub" summary={isBriefEmpty(brief) ? "No constraints" : `${report.passed}/${report.active} pass`} flag={report.failed.length ? `⚠ ${report.failed.length} failing` : undefined} autoOpen={!isBriefEmpty(brief)}>
           <Brief />
         </Section>
 
-        <Section label="Simulation" summary={simulation ? `${simulation.totals.congestion} held up · ${simulation.totals.overtakes} passes` : "Not run"} flag={simStale ? "stale" : undefined} autoOpen={!!simulation}>
-          <Simulation />
-        </Section>
-
-        <Section label="Versions" summary={versions.length ? (compare ? `Comparing ${compare.toUpperCase()}` : `${versions.length} saved`) : "None"} autoOpen={versions.length > 0}>
-          <Versions />
-        </Section>
-
         {a.warnings.length > 0 && (
-          <Section label="Geometry warnings" flag={`${a.warnings.length} warning${a.warnings.length === 1 ? "" : "s"}`}>
+          <Section label="Warnings" level="sub" flag={`⚠ ${a.warnings.length}`}>
             {a.warnings.map((w, i) => <div key={i} className="py-0.5 text-[12px] text-fg-muted before:mr-2 before:text-accent before:content-['!']">{w}</div>)}
           </Section>
         )}
+        </Section>
 
-        <Section label="Workspace" summary="Export · Present · Reset">
-          <div className="grid grid-cols-3 gap-1">
-            <Button onClick={onExport} aria-haspopup="dialog"><Download />Export</Button>
-            <Button onClick={onPresent}><Presentation />Present</Button>
-            <Button onClick={() => setConfirmReset(true)} disabled={!canReset} aria-haspopup="dialog"><RotateCcw />Reset</Button>
+        {/* 3 · Simulate — test the circuit. Everything simulation-related lives here. */}
+        <Section label="Simulate" summary={simulation ? `${simulation.totals.congestion} held up · ${simulation.totals.overtakes} passes` : "Not run"} flag={simStale ? "stale" : undefined} autoOpen={!!simulation}>
+          <div className="px-4 pb-3">
+            <Simulation />
           </div>
-          <p className="mt-2 text-[11px] leading-snug text-fg-dim">Export drawings and data, show the circuit full screen, or return this circuit to the layout it was loaded or generated with.</p>
+        </Section>
+
+        {/* 4 · Project — save, compare, export, present; reset kept apart from productive actions. */}
+        <Section label="Project" summary={versions.length ? (compare ? `Comparing ${compare.toUpperCase()}` : `${versions.length} snapshot${versions.length === 1 ? "" : "s"}`) : "Export · Present"} autoOpen={versions.length > 0}>
+          <Section label="Snapshots" level="sub" summary={versions.length ? `${versions.length} saved` : "None"} defaultOpen>
+            <Versions />
+          </Section>
+          <div className="border-t border-line/70 px-4 pb-3 pt-3">
+            <div className="grid grid-cols-2 gap-1">
+              <Button onClick={onExport} aria-haspopup="dialog"><Download />Export</Button>
+              <Button onClick={onPresent}><Presentation />Present</Button>
+            </div>
+            <div className="mt-3 flex items-center justify-between gap-3 border-t border-line/70 pt-2.5">
+              <span className="text-[11px] leading-snug text-fg-dim">Return this circuit to the layout it was {circuit.custom !== undefined ? "generated" : "loaded"} with.</span>
+              <Button variant="ghost" size="sm" className="shrink-0 text-fg-muted hover:text-accent" onClick={() => setConfirmReset(true)} disabled={!canReset} aria-haspopup="dialog"><RotateCcw />Reset</Button>
+            </div>
+          </div>
         </Section>
       </ScrollArea>
       <MoreBelow root={asideRef} />
@@ -243,7 +255,8 @@ function Event({ e, latest }: { e: Receipt; latest: boolean }) {
 function MoreBelow({ root }: { root: React.RefObject<HTMLElement | null> }) {
   const [state, setState] = useState<{ more: boolean; flags: number }>({ more: false, flags: 0 });
   const vp = () => root.current?.querySelector<HTMLElement>("[data-slot=scroll-area-viewport]") ?? null;
-  const hiddenFlags = () => { const v = vp(); if (!v) return []; const bottom = v.getBoundingClientRect().bottom; return [...v.querySelectorAll<HTMLElement>("[data-flag]")].filter((el) => el.getBoundingClientRect().top > bottom - 12); };
+  // Innermost flagged sections only: a major section repeats its children's flags in its own header when collapsed.
+  const hiddenFlags = () => { const v = vp(); if (!v) return []; const bottom = v.getBoundingClientRect().bottom; return [...v.querySelectorAll<HTMLElement>("[data-flag]")].filter((el) => !el.querySelector("[data-flag]") && el.getBoundingClientRect().top > bottom - 12); };
   const measure = () => {
     const v = vp();
     if (!v) return;
@@ -412,21 +425,22 @@ function midpoint(c: { turns: { x: number; y: number }[] }, i: number) {
  * `autoOpen` opens the section when content arrives (a brief set by the agent, a simulation run) unless the designer
  * has already toggled it by hand.
  */
-function Section({ label, summary, flag, defaultOpen = false, autoOpen = false, children }: { label: string; summary?: string; flag?: string; defaultOpen?: boolean; autoOpen?: boolean; children: React.ReactNode }) {
+function Section({ label, summary, flag, defaultOpen = false, autoOpen = false, level = "major", children }: { label: string; summary?: string; flag?: string; defaultOpen?: boolean; autoOpen?: boolean; level?: "major" | "sub"; children: React.ReactNode }) {
   const [manual, setManual] = useState<boolean | null>(null);
   const open = manual ?? (defaultOpen || autoOpen);
+  const major = level === "major";
   return (
-    <Collapsible open={open} onOpenChange={setManual} className="border-b border-line" data-flag={flag ? "" : undefined}>
-      <CollapsibleTrigger className="group flex h-8 w-full items-center gap-2 px-4 text-left outline-none transition-colors duration-120 hover:bg-surface-2 focus-visible:bg-surface-2">
-        <ChevronRight className="size-3 shrink-0 text-fg-dim transition-transform duration-120 ease-out group-data-[state=open]:rotate-90" />
-        <span className="label shrink-0 transition-colors duration-120 group-hover:text-fg group-data-[state=open]:text-fg">{label}</span>
+    <Collapsible open={open} onOpenChange={setManual} className={major ? "border-b border-line" : "border-t border-line/70"} data-flag={flag ? "" : undefined}>
+      <CollapsibleTrigger className={cn("group flex w-full items-center gap-2 text-left outline-none transition-colors duration-120 hover:bg-surface-2 focus-visible:bg-surface-2", major ? "h-9 px-4" : "h-7 pr-4 pl-4")}>
+        <ChevronRight className={cn("shrink-0 text-fg-dim transition-transform duration-120 ease-out group-data-[state=open]:rotate-90", major ? "size-3.5" : "size-3")} />
+        <span className={cn("label shrink-0 transition-colors duration-120 group-hover:text-fg", major ? "text-[12px] text-fg" : "text-[10px] group-data-[state=open]:text-fg")}>{label}</span>
         <span className="mono ml-auto flex min-w-0 items-baseline gap-2 text-[11px]">
-          {summary && <span className="truncate text-fg-muted group-data-[state=open]:hidden">{summary}</span>}
-          {flag && <span className="shrink-0 uppercase tracking-[0.06em] text-accent">{flag}</span>}
+          {summary && <span className={cn("truncate text-fg-muted group-data-[state=open]:hidden", !major && "text-[10px]")}>{summary}</span>}
+          {flag && <span className="shrink-0 text-[10px] uppercase tracking-[0.06em] text-accent">{flag}</span>}
         </span>
       </CollapsibleTrigger>
       <CollapsibleContent className="overflow-hidden data-[state=open]:animate-collapse-down data-[state=closed]:animate-collapse-up">
-        <div className="px-4 pb-3 pt-0.5">{children}</div>
+        <div className={major ? "pt-0.5" : "px-4 pb-3 pt-0.5"}>{children}</div>
       </CollapsibleContent>
     </Collapsible>
   );

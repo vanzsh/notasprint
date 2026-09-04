@@ -25,7 +25,7 @@ function DialogClose({
   return <DialogPrimitive.Close data-slot="dialog-close" {...props} />
 }
 
-/** Square-cornered panel on a dimmed workspace: `--surface` with a `--line-strong` hairline, no shadow, 120ms fade. */
+/** Rounded-rectangle panel (8px, 10px for the large dialogs) on a dimmed workspace: `--surface` with a `--line-strong` hairline, no shadow, 120ms fade. */
 function DialogContent({
   className,
   children,
@@ -40,7 +40,7 @@ function DialogContent({
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
-          "animate-pop fixed top-1/2 left-1/2 z-50 flex w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 flex-col border border-line-strong bg-surface text-fg outline-none",
+          "animate-pop fixed top-1/2 left-1/2 z-50 flex w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-lg border border-line-strong bg-surface text-fg outline-none",
           className
         )}
         {...props}

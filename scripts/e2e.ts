@@ -50,7 +50,7 @@ try {
   assert.equal(await evalJS<string>("document.querySelector('.chip')?.textContent?.trim()"), "Agent connected");
   // Onboarding and inspiration UI are visible without any interaction; circuit annotations render in Oxanium.
   const text0 = await evalJS<string>("document.body.innerText");
-  assert.ok(text0.includes("DESIGN LOOP") && text0.includes("DESIGN INSPIRATION") && text0.includes("FORMULA 1") && text0.includes("Change"), "design loop, inspiration and the circuit switcher visible");
+  assert.ok(text0.includes("DESIGN LOOP") && text0.includes("INSPIRATION") && text0.includes("SIMULATE") && text0.includes("PROJECT") && text0.includes("FORMULA 1") && text0.includes("Change"), "design loop, inspiration and the circuit switcher visible");
   assert.match(await evalJS<string>("getComputedStyle(document.querySelector('.turn-handle text')).fontFamily"), /Oxanium/, "turn numbers use Oxanium");
   assert.doesNotMatch(await evalJS<string>("getComputedStyle(document.body).fontFamily"), /Oxanium/, "product UI keeps Geist");
 
@@ -126,7 +126,7 @@ try {
   assert.ok(cmp.ok && cmp.comparison.rows.length > 5, "compare returns metric rows");
   await new Promise((r) => setTimeout(r, 300));
   const verText = await evalJS<string>("document.body.innerText");
-  assert.ok(verText.includes("VERSIONS") && verText.includes("E2E milestone") && verText.includes("CURRENT ▬"), "version list and canvas overlay legend visible");
+  assert.ok(verText.includes("SNAPSHOTS") && verText.includes("E2E milestone") && verText.includes("CURRENT ▬"), "version list and canvas overlay legend visible");
   // Reference Library through the real UI: open, switch to MotoGP, see three references, create a custom concept.
   const clickText = async (sel: string, text: string) => {
     const p = await evalJS<{ x: number; y: number } | null>(`(() => { const el = [...document.querySelectorAll('${sel}')].find(e => e.textContent.trim().startsWith(${JSON.stringify(text)})); if (!el) return null; const r = el.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`);

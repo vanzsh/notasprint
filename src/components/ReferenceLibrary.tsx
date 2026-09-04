@@ -26,7 +26,7 @@ export function ReferenceLibrary({ open, onOpenChange }: { open: boolean; onOpen
   const choose = (fn: () => void) => { fn(); onOpenChange(false); };
   return (
     <Dialog open={open} onOpenChange={(o) => { if (o) setTab(circuit.series); onOpenChange(o); }}>
-      <DialogContent className="h-[min(700px,calc(100vh-40px))] max-w-[1000px]">
+      <DialogContent className="h-[min(700px,calc(100vh-40px))] max-w-[1000px] rounded-xl">
         <DialogHeader>
           <DialogTitle>Reference Library</DialogTitle>
           <DialogDescription>Start from a reference layout or generate a concept for the discipline. Loading replaces the live circuit.</DialogDescription>

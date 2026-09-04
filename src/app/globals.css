@@ -22,8 +22,11 @@
   --asphalt: #2a2a2a;
   --asphalt-edge: #d9d6cf;
   --ease: cubic-bezier(0.2, 0, 0, 1);
-  /* One radius for every control (buttons, fields, menus, tooltips). Panels and bars stay square. */
-  --radius: 2px;
+  /* Rounded rectangle, still clearly rectangular: 6px on controls, 8px on grouped controls and dialogs, 10px on the
+     largest dialog. Panels, bars and section headers stay square. */
+  --radius: 6px;
+  --radius-grouped: 8px;
+  --radius-dialog: 10px;
 
   /* shadcn semantic tokens, aliased onto the NotASprint palette so primitives inherit the identity. */
   --background: var(--bg);
@@ -73,7 +76,8 @@
   --font-track: var(--font-oxanium);
   --radius-sm: var(--radius);
   --radius-md: var(--radius);
-  --radius-lg: var(--radius);
+  --radius-lg: var(--radius-grouped);
+  --radius-xl: var(--radius-dialog);
   --ease-out: var(--ease);
   --animate-collapse-down: collapse-down 160ms var(--ease);
   --animate-collapse-up: collapse-up 120ms var(--ease);
