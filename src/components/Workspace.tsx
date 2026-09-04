@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import { deleteTurn, setLocks } from "@/lib/moves";
 import { seriesById } from "@/lib/series";
 import { commit, getState, hydrate, redo, select, undo, useStore } from "@/lib/store";
@@ -12,7 +13,7 @@ import { Canvas } from "./Canvas";
 import { ExportDialog } from "./ExportDialog";
 import { Panel } from "./Panel";
 import { Present } from "./Present";
-import { ReferenceLibrary } from "./ReferenceLibrary";
+import { ReferenceLibrary, SERIES_LOGO } from "./ReferenceLibrary";
 
 const AGENT_TEXT = {
   connected: { label: "Agent connected", tip: "WebMCP tools registered. An agent in this browser reads and edits this live circuit with you." },
@@ -59,6 +60,10 @@ export function Workspace() {
           <span className="label hidden lg:inline">Circuit Design Lab</span>
         </div>
         <Separator orientation="vertical" className="h-4" />
+        <div className="hidden min-w-0 items-center gap-1.5 text-[12px] text-fg-dim md:flex">
+          <Image src={SERIES_LOGO[circuit.series]} alt="" width={14} height={14} unoptimized className="size-3.5 shrink-0 rounded-[2px] object-contain" />
+          <span className="truncate"><span className="text-fg-muted">{series.name}</span> · {circuit.name}</span>
+        </div>
         <div className="flex items-center">
           <Tooltip>
             <TooltipTrigger asChild><Button size="icon" className="rounded-r-none" onClick={() => undo()} disabled={!canUndo} aria-label="Undo"><Undo2 /></Button></TooltipTrigger>
@@ -70,7 +75,6 @@ export function Workspace() {
           </Tooltip>
         </div>
         <div className="ml-auto flex items-center gap-3">
-          <span className="hidden text-[12px] text-fg-dim md:inline">{series.name} · {circuit.name}</span>
           <Tooltip>
             <TooltipTrigger asChild>
               <span className="chip" tabIndex={0}>
