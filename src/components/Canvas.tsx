@@ -189,7 +189,7 @@ export function Canvas() {
       })}
 
       {/* Simulated cars on this circuit's own centreline; hidden once the geometry no longer matches the run */}
-      {simulation && simulation.fingerprint === fingerprint(circuit) && <SimCars result={simulation} run={simRun} g={g} px={px} view={{ x: vx, y: vy, w: vw, h: vh }} />}
+      {simulation && simulation.fingerprint === fingerprint(circuit) && <SimCars result={simulation} run={simRun} g={g} px={px} view={{ x: vx, y: vy, w: vw, h: vh }} series={circuit.series} />}
     </svg>
   );
 }

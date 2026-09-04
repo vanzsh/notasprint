@@ -2,16 +2,21 @@
 import { useEffect, useMemo } from "react";
 import { lapPath, type Geometry } from "@/lib/circuit";
 import { advance, PLAYBACK_RATE, restart, usePlayback } from "@/lib/playback";
+import { seriesById, type SeriesId } from "@/lib/series";
 import type { SimResult } from "@/lib/simulation";
 
 const f = (n: number) => Math.round(n * 100) / 100;
 
 /**
- * Simulated cars drawn on the live circuit's own centreline. Positions come from the recorded run, interpolated
- * between frames; the rAF loop lives here so nothing else re-renders per tick.
+ * Simulated vehicles drawn on the live circuit's own centreline. Positions come from the recorded run, interpolated
+ * between frames; the rAF loop lives here so nothing else re-renders per tick. The glyph is a plain oriented
+ * rectangle sized from the discipline's vehicle (a single-seater or a motorcycle), never a livery.
  */
-export function SimCars({ result, run, g, px, view }: { result: SimResult; run: number; g: Geometry; px: number; view: { x: number; y: number; w: number; h: number } }) {
+export function SimCars({ result, run, g, px, view, series }: { result: SimResult; run: number; g: Geometry; px: number; view: { x: number; y: number; w: number; h: number }; series: SeriesId }) {
   const path = useMemo(() => lapPath(g), [g]);
+  const s = seriesById(series);
+  // Never smaller than ~7 × 3 px on screen, otherwise true to the vehicle's footprint.
+  const len = Math.max(s.vehicle.length, 7 * px), wid = Math.max(s.vehicle.width, (s.noun === "bike" ? 2.4 : 3.2) * px);
   const playing = usePlayback((p) => p.playing);
   const t = usePlayback((p) => p.t);
   const { step, s: frames } = result.frames;
@@ -37,11 +42,12 @@ export function SimCars({ result, run, g, px, view }: { result: SimResult; run: 
       {a.map((sa, c) => {
         const sb = b[c];
         if (Number.isNaN(sa) || Number.isNaN(sb)) return null; // finished cars leave the track
-        const p = path.at(sa + (sb - sa) * k);
-        return <circle key={c} className="sim-car" cx={f(p.x)} cy={f(p.y)} r={f(3 * px)} fill="var(--fg)" stroke="var(--bg)" strokeWidth={f(1 * px)} />;
+        const at = sa + (sb - sa) * k, p = path.at(at), q = path.at(at + 2);
+        const deg = (Math.atan2(q.y - p.y, q.x - p.x) * 180) / Math.PI;
+        return <rect key={c} className="sim-car" x={f(p.x - len / 2)} y={f(p.y - wid / 2)} width={f(len)} height={f(wid)} rx={f(wid / 2)} transform={`rotate(${f(deg)} ${f(p.x)} ${f(p.y)})`} fill="var(--fg)" stroke="var(--bg)" strokeWidth={f(0.8 * px)} />;
       })}
       <text x={f(view.x + view.w - 16 * px)} y={f(view.y + view.h - 14 * px)} className="track" fontSize={f(11 * px)} fill="var(--fg-dim)" textAnchor="end">
-        SIM LAP {lap}/{result.params.laps} · {result.params.cars} CARS · {PLAYBACK_RATE}×{playing ? "" : " · PAUSED"}
+        SIM LAP {lap}/{result.params.laps} · {result.params.cars} {s.noun.toUpperCase()}S · {PLAYBACK_RATE}×{playing ? "" : " · PAUSED"}
       </text>
     </g>
   );

@@ -1,11 +1,12 @@
 "use client";
 import { useRef, useState } from "react";
-import { ChevronRight, Lock, LockOpen, Plus, Trash2 } from "lucide-react";
+import { ChevronRight, Lock, LockOpen, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { ARCHETYPES, archetypeById, type ArchetypeId } from "@/lib/archetypes";
 import { fingerprint, fmtKm, fmtLap, type Analysis, type Circuit } from "@/lib/circuit";
 import { evaluateBrief, isBriefEmpty } from "@/lib/constraints";
 import { applyInspiration, deleteTurn, editTurns, insertTurns, setLocks, type InspirationScope } from "@/lib/moves";
-import { commit, getState, preview, SCORE_LABEL, select, undo, useStore } from "@/lib/store";
+import { seriesById } from "@/lib/series";
+import { commit, getState, loadCustom, preview, SCORE_LABEL, select, undo, useStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -44,6 +45,7 @@ export function Panel() {
   const turn = selIdx >= 0 ? circuit.turns[selIdx] : null;
   const ta = selIdx >= 0 ? a.turns[selIdx] : null;
   const example = archetypeById(circuit.inspiration ?? "")?.name;
+  const series = seriesById(circuit.series);
   const report = evaluateBrief(brief, circuit, a);
   const simStale = simulation ? simulation.fingerprint !== fingerprint(circuit) : false;
   const scoreKeys = Object.keys(SCORE_LABEL) as (keyof typeof SCORE_LABEL)[];
@@ -51,12 +53,24 @@ export function Panel() {
   return (
     <aside className="flex h-full min-h-0 flex-col border-l border-line bg-surface">
       <ScrollArea className="min-h-0 flex-1">
-        <Section label="Circuit" summary={`${fmtKm(a.length)} km · ${a.turnCount} turns`} defaultOpen>
-          <div className="display text-[28px] leading-none">{circuit.name}</div>
+        <Section label="Circuit" summary={`${series.short} · ${fmtKm(a.length)} km · ${a.turnCount} turns`} defaultOpen>
+          <div className="flex items-start justify-between gap-2">
+            <div className="display min-w-0 text-[28px] leading-none">{circuit.name}</div>
+            {circuit.custom !== undefined && (
+              <Tooltip>
+                <TooltipTrigger asChild><Button variant="ghost" size="icon-sm" className="mt-0.5 shrink-0" onClick={() => loadCustom(circuit.series)} aria-label="Create another concept"><RefreshCw /></Button></TooltipTrigger>
+                <TooltipContent side="left">Create another {series.name} concept. This one is seed {circuit.custom}; the agent can reproduce it.</TooltipContent>
+              </Tooltip>
+            )}
+          </div>
           <div className="mt-1 truncate text-[12px] text-fg-muted" title={circuit.tagline}>{circuit.tagline}</div>
           <Tooltip>
-            <TooltipTrigger asChild><div className="mono mt-1 w-fit cursor-help text-[11px] text-fg-dim">Reference layout · {example ? `${example} example` : "Mixed character"}</div></TooltipTrigger>
-            <TooltipContent side="left">Reference layouts are example starting points. Design inspirations are characteristics applied to the live circuit.</TooltipContent>
+            <TooltipTrigger asChild>
+              <div className="mono mt-1 w-fit cursor-help truncate text-[11px] text-fg-dim">
+                <span className="text-fg-muted">{series.name}</span> · {circuit.custom !== undefined ? `Generated concept · seed ${circuit.custom}` : circuit.location ? `Reference · ${circuit.location}` : "NotASprint original"}{example ? ` · ${example} example` : ""}
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="left">Scores, warnings and the simulation use the {series.name} vehicle model: {Math.round(series.vehicle.vMax * 3.6)} km/h, {(series.vehicle.aLat / 9.81).toFixed(1)} g lateral. Reference layouts are schematic starting points; design inspirations are characteristics applied to the live circuit.</TooltipContent>
           </Tooltip>
           <div className="mt-3 flex items-end gap-6">
             <Hero value={fmtKm(a.length)} unit="km" label="Length" />

@@ -1,20 +1,18 @@
 "use client";
-import { useEffect } from "react";
-import { buildGeometry } from "@/lib/circuit";
-import { CIRCUITS } from "@/lib/circuits";
+import { useEffect, useState } from "react";
 import { deleteTurn, setLocks } from "@/lib/moves";
-import { commit, getState, hydrate, loadCircuit, redo, select, undo, useStore } from "@/lib/store";
-import { exportJSON, exportSVG } from "@/lib/export";
-import { download } from "@/lib/tools";
+import { seriesById } from "@/lib/series";
+import { commit, getState, hydrate, redo, select, undo, useStore } from "@/lib/store";
 import { registerWebMCP } from "@/lib/webmcp";
-import { ChevronDown, Download, Redo2, Undo2 } from "lucide-react";
+import { Download, LibraryBig, Presentation, Redo2, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuShortcut, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Canvas } from "./Canvas";
+import { ExportDialog } from "./ExportDialog";
 import { Panel } from "./Panel";
+import { Present } from "./Present";
+import { ReferenceLibrary } from "./ReferenceLibrary";
 
 const AGENT_TEXT = {
   connected: { label: "Agent connected", tip: "WebMCP tools registered. An agent in this browser reads and edits this live circuit with you." },
@@ -27,6 +25,10 @@ export function Workspace() {
   const agent = useStore((s) => s.agent);
   const canUndo = useStore((s) => s.past.length > 0);
   const canRedo = useStore((s) => s.future.length > 0);
+  const [library, setLibrary] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [present, setPresent] = useState(false);
+  const series = seriesById(circuit.series);
 
   useEffect(() => registerWebMCP(), []);
   useEffect(() => { hydrate(); }, []); // brief and versions from localStorage, after mount so the first render matches the server
@@ -47,10 +49,7 @@ export function Workspace() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  const exportFile = (fmt: "json" | "svg") => {
-    const { circuit: c, analysis } = getState();
-    download(`${c.id}.${fmt}`, fmt === "svg" ? exportSVG(c, buildGeometry(c.turns)) : exportJSON(c, analysis), fmt === "svg" ? "image/svg+xml" : "application/json");
-  };
+  if (present) return <Present onExit={() => setPresent(false)} />;
 
   return (
     <div className="grid h-full grid-rows-[48px_1fr] bg-bg text-fg">
@@ -60,17 +59,12 @@ export function Workspace() {
           <span className="label hidden lg:inline">Circuit Design Lab</span>
         </div>
         <Separator orientation="vertical" className="h-4" />
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5">
           <Tooltip>
-            <TooltipTrigger asChild><span className="label cursor-help">Reference</span></TooltipTrigger>
-            <TooltipContent>Example starting layouts. Design inspirations (in the panel) are characteristics applied to the live circuit.</TooltipContent>
+            <TooltipTrigger asChild><Button onClick={() => setLibrary(true)} aria-haspopup="dialog"><LibraryBig />Reference</Button></TooltipTrigger>
+            <TooltipContent>Reference Library: three layouts per motorsport, or generate a custom concept.</TooltipContent>
           </Tooltip>
-          <Select value={circuit.id} onValueChange={(id) => loadCircuit(id)}>
-            <SelectTrigger aria-label="Reference layout" className="min-w-[150px]"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {CIRCUITS.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-            </SelectContent>
-          </Select>
+          <span className="mono hidden text-[11px] text-fg-muted md:inline"><span className="text-fg">{series.name}</span> · {circuit.name}</span>
         </div>
         <div className="flex items-center">
           <Tooltip>
@@ -92,16 +86,13 @@ export function Workspace() {
             </TooltipTrigger>
             <TooltipContent side="bottom" align="end">{AGENT_TEXT[agent].tip}</TooltipContent>
           </Tooltip>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button><Download />Export<ChevronDown className="-mr-1 size-3" /></Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="min-w-[200px]">
-              <DropdownMenuLabel>Export {circuit.name}</DropdownMenuLabel>
-              <DropdownMenuItem onSelect={() => exportFile("json")}>JSON<span className="text-fg-muted">definition + analysis</span><DropdownMenuShortcut>.json</DropdownMenuShortcut></DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => exportFile("svg")}>SVG<span className="text-fg-muted">layout drawing</span><DropdownMenuShortcut>.svg</DropdownMenuShortcut></DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <div className="flex items-center gap-1">
+            <Tooltip>
+              <TooltipTrigger asChild><Button size="icon" onClick={() => setPresent(true)} aria-label="Presentation view"><Presentation /></Button></TooltipTrigger>
+              <TooltipContent>Presentation view: circuit and headline metrics, full screen.</TooltipContent>
+            </Tooltip>
+            <Button onClick={() => setExporting(true)} aria-haspopup="dialog"><Download />Export</Button>
+          </div>
         </div>
       </header>
       <main className="grid min-h-0 grid-cols-[1fr_minmax(320px,min(26%,400px))]">
@@ -110,6 +101,8 @@ export function Workspace() {
         </div>
         <Panel />
       </main>
+      <ReferenceLibrary open={library} onOpenChange={setLibrary} />
+      <ExportDialog open={exporting} onOpenChange={setExporting} />
     </div>
   );
 }

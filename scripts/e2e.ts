@@ -42,6 +42,7 @@ try {
   await send("Runtime.enable");
   await send("Page.navigate", { url });
   await new Promise((r) => setTimeout(r, 2500));
+  if (await evalJS<boolean>("!!localStorage.getItem('notasprint.studio.v1')")) { await evalJS("localStorage.removeItem('notasprint.studio.v1'); 1"); await send("Page.reload"); await new Promise((r) => setTimeout(r, 2500)); }
 
   const names = await evalJS<string[]>("document.modelContext.getTools().then(ts => ts.map(t => t.name).sort())");
   console.log("registered tools:", names.join(", "));
@@ -49,7 +50,7 @@ try {
   assert.equal(await evalJS<string>("document.querySelector('.chip')?.textContent?.trim()"), "Agent connected");
   // Onboarding and inspiration UI are visible without any interaction; circuit annotations render in Oxanium.
   const text0 = await evalJS<string>("document.body.innerText");
-  assert.ok(text0.includes("DESIGN LOOP") && text0.includes("DESIGN INSPIRATION") && text0.includes("REFERENCE"), "design loop, inspiration and reference labels visible");
+  assert.ok(text0.includes("DESIGN LOOP") && text0.includes("DESIGN INSPIRATION") && text0.includes("Reference") && text0.includes("Formula 1"), "design loop, inspiration, reference and motorsport labels visible");
   assert.match(await evalJS<string>("getComputedStyle(document.querySelector('.turn-handle text')).fontFamily"), /Oxanium/, "turn numbers use Oxanium");
   assert.doesNotMatch(await evalJS<string>("getComputedStyle(document.body).fontFamily"), /Oxanium/, "product UI keeps Geist");
 
@@ -126,6 +127,29 @@ try {
   await new Promise((r) => setTimeout(r, 300));
   const verText = await evalJS<string>("document.body.innerText");
   assert.ok(verText.includes("VERSIONS") && verText.includes("E2E milestone") && verText.includes("CURRENT ▬"), "version list and canvas overlay legend visible");
+  // Reference Library through the real UI: open, switch to MotoGP, see three references, create a custom concept.
+  const clickText = async (sel: string, text: string) => {
+    const p = await evalJS<{ x: number; y: number } | null>(`(() => { const el = [...document.querySelectorAll('${sel}')].find(e => e.textContent.trim().startsWith(${JSON.stringify(text)})); if (!el) return null; const r = el.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`);
+    assert.ok(p, `${text} clickable`);
+    await mouse("mousePressed", p!.x, p!.y); await mouse("mouseReleased", p!.x, p!.y); await new Promise((r) => setTimeout(r, 350));
+  };
+  await clickText("header button", "Reference");
+  assert.equal(await evalJS<string>("document.querySelector('[data-slot=dialog-title]')?.textContent"), "Reference Library", "library opens");
+  await clickText("[data-slot=tabs-trigger]", "MotoGP");
+  await new Promise((r) => setTimeout(r, 600));
+  const libText = await evalJS<string>("document.querySelector('[data-slot=dialog-content]').innerText");
+  for (const n of ["Autodromo Internazionale del Mugello", "TT Circuit Assen", "Phillip Island Grand Prix Circuit", "Create custom", "Not affiliated with or endorsed"]) assert.ok(libText.toUpperCase().includes(n.toUpperCase()), `${n} shown`);
+  assert.equal(await evalJS<number>("[...document.querySelectorAll('[data-slot=dialog-content] img')].filter(i => i.complete && i.naturalWidth > 0).length"), 3, "three series logos load");
+  await clickText("[data-slot=dialog-content] button", "Create custom");
+  const custom = JSON.parse(await evalJS<string>(`document.modelContext.getTools().then(ts => document.modelContext.executeTool(ts.find(t => t.name === 'get_circuit'), '{}'))`));
+  assert.ok(custom.motorsport.id === "motogp" && custom.reference.kind === "custom" && custom.turn_count >= 6, "a custom MotoGP concept is the live circuit");
+  assert.equal(await evalJS<unknown>("document.querySelector('[data-slot=dialog-content]')"), null, "library closes after picking");
+  assert.ok((await evalJS<string>("document.body.innerText")).includes("MotoGP"), "panel shows the motorsport");
+  const sim2 = JSON.parse(await evalJS<string>(`document.modelContext.getTools().then(ts => document.modelContext.executeTool(ts.find(t => t.name === 'run_simulation'), JSON.stringify({ seed: 2, cars: 8 })))`));
+  assert.ok(sim2.ok && sim2.simulation.findings.length > 0, "simulation runs on the generated circuit");
+  await new Promise((r) => setTimeout(r, 500));
+  assert.equal(await evalJS<number>("document.querySelectorAll('.sim-car').length"), 8, "8 bikes drawn");
+  assert.ok((await evalJS<string>("document.body.innerText")).includes("8 BIKES"), "canvas telemetry says bikes");
   await evalJS("localStorage.removeItem('notasprint.studio.v1'); 1");
   await shot("/tmp/notasprint-e2e.png");
   assert.deepEqual(errors, [], "no browser errors");

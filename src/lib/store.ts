@@ -1,8 +1,10 @@
 // Single source of truth shared by the canvas, the panel and the WebMCP tools.
 import { useSyncExternalStore } from "react";
 import { analyze, SCORE_LABEL, type Analysis, type Circuit } from "./circuit";
-import { CIRCUITS, DEFAULT_CIRCUIT } from "./circuits";
+import { CIRCUITS, circuitById, DEFAULT_CIRCUIT } from "./circuits";
 import { isBriefEmpty, type Brief } from "./constraints";
+import { freshSeed, generateCircuit } from "./generate";
+import { SERIES, type SeriesId } from "./series";
 import { compactResult, DEFAULT_SIM, simulate, type CompactSimResult, type SimParams, type SimResult } from "./simulation";
 import { deserializeVersions, makeVersion, MAX_VERSIONS, serializeVersions, type Snapshot, type Version } from "./versions";
 export { SCORE_LABEL };
@@ -79,11 +81,20 @@ export function redo() {
   return 1;
 }
 
-export function loadCircuit(id: string, source: "agent" | "human" = "human") {
-  const c = CIRCUITS.find((x) => x.id === id);
-  if (!c) throw new Error(`Unknown circuit "${id}". Available: ${CIRCUITS.map((x) => x.id).join(", ")}`);
-  set({ circuit: c, analysis: analyze(c), past: [], future: [], selected: null, flash: null, receipt: { text: `Loaded ${c.name}`, source, at: Date.now() }, lastChange: `${c.name} concept`, simulation: null, simulationBefore: null, compare: null });
+/** Replace the workspace with a circuit: history, selection, simulation and comparison all start over. */
+function mount(c: Circuit, source: "agent" | "human", label: string) {
+  set({ circuit: c, analysis: analyze(c), past: [], future: [], selected: null, flash: null, receipt: { text: label, source, at: Date.now() }, lastChange: `${c.name} concept`, simulation: null, simulationBefore: null, compare: null });
   return c;
+}
+export function loadCircuit(id: string, source: "agent" | "human" = "human") {
+  const c = circuitById(id);
+  if (!c) throw new Error(`Unknown circuit "${id}". Available: ${CIRCUITS.map((x) => x.id).join(", ")}`);
+  return mount(c, source, `Loaded ${c.name}`);
+}
+/** Generate and load a custom concept for a discipline. Omit the seed for a fresh one; pass it to reproduce. */
+export function loadCustom(series: SeriesId, seed = freshSeed(), source: "agent" | "human" = "human") {
+  const c = generateCircuit(series, seed);
+  return mount(c, source, `Generated ${SERIES[series].name} concept · seed ${seed}`);
 }
 
 export const select = (id: string | null) => set({ selected: id });
@@ -112,7 +123,7 @@ export function runSimulation(params: Partial<SimParams> = {}, source: "agent" |
   const result = simulate(state.circuit, simParams);
   set({
     simParams, simulation: result, simulationBefore: state.simulation ? compactResult(state.simulation) : state.simulationBefore, simRun: state.simRun + 1,
-    receipt: { label: `Simulation · ${simParams.cars} cars · ${simParams.laps} laps`, text: `${result.totals.congestion} held up · ${result.totals.contacts} contacts · ${result.totals.overtakes} passes`, source, at: Date.now() },
+    receipt: { label: `Simulation · ${simParams.cars} ${SERIES[state.circuit.series].noun}s · ${simParams.laps} laps`, text: `${result.totals.congestion} held up · ${result.totals.contacts} contacts · ${result.totals.overtakes} passes`, source, at: Date.now() },
   });
   return result;
 }

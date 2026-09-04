@@ -3,6 +3,7 @@ import { Pause, Play, RotateCcw } from "lucide-react";
 import { fingerprint } from "@/lib/circuit";
 import { pause, play, restart, usePlayback } from "@/lib/playback";
 import { compareSimulations, type Finding } from "@/lib/simulation";
+import { seriesById } from "@/lib/series";
 import { runSimulation, select, setSimParams, useStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -24,11 +25,12 @@ export function Simulation() {
   const stale = result ? result.fingerprint !== fingerprint(circuit) : false;
   const level = (v: number) => LEVELS.reduce((b, l) => (Math.abs(l[1] - v) < Math.abs(b[1] - v) ? l : b))[0];
   const cmp = result && before ? compareSimulations(before, result) : null;
+  const noun = seriesById(circuit.series).noun;
 
   return (
     <div className="space-y-2">
       <div className="grid grid-cols-2 gap-1">
-        <Param label="Cars" value={String(params.cars)} onChange={(v) => setSimParams({ cars: Number(v) })} options={[6, 8, 12, 16, 20].map((n) => [String(n), `${n} cars`])} />
+        <Param label="Field size" value={String(params.cars)} onChange={(v) => setSimParams({ cars: Number(v) })} options={[6, 8, 12, 16, 20].map((n) => [String(n), `${n} ${noun}s`])} />
         <Param label="Laps" value={String(params.laps)} onChange={(v) => setSimParams({ laps: Number(v) })} options={[3, 5, 8, 10].map((n) => [String(n), `${n} laps`])} />
         <Param label="Driver variance" tip="Driver skill and lap-to-lap spread" value={level(params.variance)} onChange={(v) => setSimParams({ variance: LEVELS.find((l) => l[0] === v)![1] })} options={LEVELS.map(([l]) => [l, `${l} variance`])} />
         <Param label="Aggression" tip="Willingness to attempt marginal passes" value={level(params.aggression)} onChange={(v) => setSimParams({ aggression: LEVELS.find((l) => l[0] === v)![1] })} options={LEVELS.map(([l]) => [l, `${l} aggression`])} />
@@ -41,7 +43,7 @@ export function Simulation() {
         {result && <span className="mono ml-auto truncate text-[11px] text-fg-dim">seed {result.params.seed}</span>}
       </div>
       {!result ? (
-        <div className="text-[12px] text-fg-dim">Race a small field around this circuit and read where cars bunch, pass or make contact. Simulated design signals, not real-world predictions.</div>
+        <div className="text-[12px] text-fg-dim">Race a small field of {noun}s around this circuit and read where they bunch, pass or make contact. Simulated design signals, not real-world predictions.</div>
       ) : (
         <>
           {stale && <div className="mono text-[11px] text-fg-muted before:mr-2 before:text-accent before:content-['!']">Circuit changed since this run · run again for current signals</div>}
