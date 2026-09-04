@@ -433,7 +433,7 @@ function Section({ label, summary, flag, defaultOpen = false, autoOpen = false, 
     <Collapsible open={open} onOpenChange={setManual} className={major ? "border-b border-line" : "border-t border-line/70"} data-flag={flag ? "" : undefined}>
       <CollapsibleTrigger className={cn("group flex w-full items-center gap-2 text-left outline-none transition-colors duration-120 hover:bg-surface-2 focus-visible:bg-surface-2", major ? "h-9 px-4" : "h-7 pr-4 pl-4")}>
         <ChevronRight className={cn("shrink-0 text-fg-dim transition-transform duration-120 ease-out group-data-[state=open]:rotate-90", major ? "size-3.5" : "size-3")} />
-        <span className={cn("label shrink-0 transition-colors duration-120 group-hover:text-fg", major ? "text-[12px] text-fg" : "text-[10px] group-data-[state=open]:text-fg")}>{label}</span>
+        <span className={cn("label shrink-0 transition-colors duration-120", major ? "display text-[15px] font-bold tracking-[0.06em] text-accent" : "text-[10px] group-hover:text-fg group-data-[state=open]:text-fg")}>{label}</span>
         <span className="mono ml-auto flex min-w-0 items-baseline gap-2 text-[11px]">
           {summary && <span className={cn("truncate text-fg-muted group-data-[state=open]:hidden", !major && "text-[10px]")}>{summary}</span>}
           {flag && <span className="shrink-0 text-[10px] uppercase tracking-[0.06em] text-accent">{flag}</span>}
