@@ -400,14 +400,14 @@ export const tools: Tool[] = [
 ];
 
 /** Build a drawing in a style and, in a browser, download it. Returns what was produced. */
-export async function exportDrawing(circuit: Circuit, analysis: Analysis, fmt: Exclude<ExportFormat, "json">, style: ExportStyle) {
-  const svg = exportSVG(circuit, analysis, buildGeometry(circuit.turns), style, { transparent: fmt === "png-transparent" });
-  const name = `${circuit.id}-${style}`;
-  if (fmt === "svg") { if (typeof document !== "undefined") download(`${name}.svg`, svg, "image/svg+xml"); return { downloaded: `${name}.svg`, style, bytes: svg.length }; }
+export async function exportDrawing(circuit: Circuit, analysis: Analysis, fmt: Exclude<ExportFormat, "json">, style: ExportStyle, transparent = fmt === "png-transparent") {
+  const svg = exportSVG(circuit, analysis, buildGeometry(circuit.turns), style, { transparent });
+  const name = `${circuit.id}-${style}${transparent ? "-transparent" : ""}`;
+  if (fmt === "svg") { if (typeof document !== "undefined") download(`${name}.svg`, svg, "image/svg+xml"); return { downloaded: `${name}.svg`, style, bytes: svg.length, transparent }; }
   if (typeof document === "undefined") throw new Error("PNG export needs the designer's browser; use svg or json here.");
   const png = await svgToPng(svg);
-  download(`${name}${fmt === "png-transparent" ? "-transparent" : ""}.png`, png);
-  return { downloaded: `${name}.png`, style, bytes: png.size, transparent: fmt === "png-transparent" };
+  download(`${name}.png`, png);
+  return { downloaded: `${name}.png`, style, bytes: png.size, transparent };
 }
 
 export function download(name: string, body: string | Blob, type = "application/octet-stream") {

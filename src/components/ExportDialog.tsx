@@ -1,5 +1,6 @@
 "use client";
 import { useMemo, useState } from "react";
+import { ChevronDown, Download } from "lucide-react";
 import { buildGeometry } from "@/lib/circuit";
 import { EXPORT_STYLE_INFO, EXPORT_STYLES, exportJSON, exportSVG, type ExportStyle } from "@/lib/export";
 import { download, exportDrawing } from "@/lib/tools";
@@ -7,27 +8,39 @@ import { getState, useStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Switch } from "@/components/ui/switch";
 
-/** Export: pick a presentation style, see it, download as SVG, PNG (opaque or transparent) or JSON. */
+type Fmt = "png" | "svg" | "json";
+const FMT: Record<Fmt, { label: string; blurb: string }> = {
+  png: { label: "PNG", blurb: "2400 px raster drawing" },
+  svg: { label: "SVG", blurb: "Vector drawing" },
+  json: { label: "JSON", blurb: "Definition and analysis" },
+};
+
+/** Export: pick a style, see it, choose a format once, download. Transparency is a switch that applies to drawings. */
 export function ExportDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
   const circuit = useStore((s) => s.circuit);
   const analysis = useStore((s) => s.analysis);
   const [style, setStyle] = useState<ExportStyle>("technical");
-  const [busy, setBusy] = useState<string | null>(null);
-  const preview = useMemo(() => (open ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(exportSVG(circuit, analysis, buildGeometry(circuit.turns), style))}` : ""), [open, circuit, analysis, style]);
-  const save = async (fmt: "svg" | "png" | "png-transparent") => {
-    setBusy(fmt);
-    try { await exportDrawing(circuit, analysis, fmt, style); } finally { setBusy(null); }
+  const [fmt, setFmt] = useState<Fmt>("png");
+  const [transparent, setTransparent] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const preview = useMemo(() => (open ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(exportSVG(circuit, analysis, buildGeometry(circuit.turns), style, { transparent }))}` : ""), [open, circuit, analysis, style, transparent]);
+  const save = async () => {
+    if (fmt === "json") { const { circuit: c, analysis: a } = getState(); download(`${c.id}.json`, exportJSON(c, a), "application/json"); return; }
+    setBusy(true);
+    try { await exportDrawing(circuit, analysis, fmt, style, transparent); } finally { setBusy(false); }
   };
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[920px] rounded-xl">
         <DialogHeader>
           <DialogTitle>Export</DialogTitle>
-          <DialogDescription>{circuit.name} · drawings are 2400 px wide; JSON carries the definition and analysis.</DialogDescription>
+          <DialogDescription>{circuit.name}</DialogDescription>
         </DialogHeader>
         <div className="grid grid-cols-[1fr_260px] gap-5 p-5">
-          <div className="flex items-center justify-center border border-line bg-bg p-2">
+          <div className={cn("flex items-center justify-center rounded-lg border border-line p-2", transparent ? "bg-[#151515]" : "bg-bg")}>
             {/* eslint-disable-next-line @next/next/no-img-element -- data URL preview of the export itself */}
             {preview && <img src={preview} alt={`${EXPORT_STYLE_INFO[style].name} export preview`} className="max-h-[440px] w-full object-contain" />}
           </div>
@@ -43,14 +56,22 @@ export function ExportDialog({ open, onOpenChange }: { open: boolean; onOpenChan
                 ))}
               </div>
             </div>
-            <div>
-              <div className="label mb-1.5">Download</div>
-              <div className="grid grid-cols-2 gap-1">
-                <Button variant="primary" disabled={!!busy} onClick={() => save("png")}>{busy === "png" ? "Rendering…" : "PNG"}</Button>
-                <Button disabled={!!busy} onClick={() => save("png-transparent")}>{busy === "png-transparent" ? "Rendering…" : "PNG · transparent"}</Button>
-                <Button disabled={!!busy} onClick={() => save("svg")}>SVG</Button>
-                <Button disabled={!!busy} onClick={() => { const { circuit: c, analysis: a } = getState(); download(`${c.id}.json`, exportJSON(c, a), "application/json"); }}>JSON</Button>
-              </div>
+            <label className={cn("flex items-center justify-between gap-3 text-[12px] transition-opacity", fmt === "json" ? "opacity-40" : "cursor-pointer")}>
+              <span className="text-fg">Transparent background</span>
+              <Switch checked={transparent} onCheckedChange={setTransparent} disabled={fmt === "json"} aria-label="Transparent background" />
+            </label>
+            <div className="flex">
+              <Button variant="primary" className="flex-1 rounded-r-none" disabled={busy} onClick={save}><Download />{busy ? "Rendering…" : `Export ${FMT[fmt].label}`}</Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild><Button variant="primary" size="icon" className="-ml-px rounded-l-none border-l-bg/30" aria-label="Choose export format"><ChevronDown /></Button></DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="min-w-[200px]">
+                  {(Object.keys(FMT) as Fmt[]).map((f) => (
+                    <DropdownMenuItem key={f} onSelect={() => setFmt(f)} className={cn(f === fmt && "bg-surface-2")}>
+                      <span className="w-10 font-medium">{FMT[f].label}</span><span className="text-fg-muted">{FMT[f].blurb}</span>
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
         </div>
