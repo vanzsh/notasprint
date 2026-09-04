@@ -1,14 +1,39 @@
 import type { Circuit, Turn } from "./circuit";
+import { SERIES_IDS, type SeriesId } from "./series";
 
-// Original layouts. Coordinates in metres, +y down. Every vertex is a turn; sectors are per turn.
-// Each layout is an example starting point for a design archetype (see archetypes.ts), not the archetype itself.
+// Reference layouts. Coordinates in metres, +y down. Every vertex is a turn; sectors are per turn.
+// These are schematic interpretations of well-known circuits, drawn for design inspiration: they carry the
+// character and rough proportions of the real place, not survey geometry or any official data.
 const T = (x: number, y: number, radius: number, sector: 1 | 2 | 3, name?: string): Turn => ({
   id: `${x}_${y}`, x, y, radius, sector, name,
 });
+/** Uniformly scale a sketch to its real-world lap length. */
+const scale = (k: number, turns: Turn[]) => turns.map((t) => T(Math.round(t.x * k), Math.round(t.y * k), Math.round(t.radius * k), t.sector, t.name));
+
+const monaco: Turn[] = [
+  T(960, 80, 28, 1, "Sainte Dévote"),
+  T(960, 230, 50, 1, "Beau Rivage"),
+  T(1150, 250, 22, 1, "Massenet"),
+  T(1130, 430, 24, 1, "Casino"),
+  T(1010, 450, 22, 1, "Mirabeau"),
+  T(1050, 610, 16, 2, "Grand Hotel"),
+  T(930, 520, 24, 2, "Portier"),
+  T(870, 690, 40, 2, "Tunnel"),
+  T(640, 760, 30, 2, "Nouvelle Chicane"),
+  T(600, 720, 30, 2),
+  T(380, 780, 18, 2, "Tabac"),
+  T(340, 640, 30, 3, "Piscine"),
+  T(460, 520, 45, 3),
+  T(440, 360, 30, 3, "La Rascasse"),
+  T(250, 330, 26, 3, "Antony Noghès"),
+  T(200, 150, 24, 3),
+  T(300, 80, 60, 3),
+];
 
 export const CIRCUITS: Circuit[] = [
+  // NotASprint original: the default workspace when the studio opens.
   {
-    id: "silver-fields",
+    id: "silver-fields", series: "f1",
     name: "Silver Fields",
     tagline: "Fast sweeping sections mixed with traditional technical corners.",
     trackWidth: 14,
@@ -29,18 +54,21 @@ export const CIRCUITS: Circuit[] = [
       T(760, 150, 400, 3),
     ],
   },
+
+  // ---- Formula 1 ----
   {
-    id: "temple-of-speed",
-    name: "Temple of Speed",
+    id: "monza", series: "f1",
+    name: "Autodromo Nazionale Monza", location: "Monza, Italy",
     tagline: "Long straights, hard braking, high-speed character.",
+    character: ["High speed", "Long straights", "Heavy braking"],
     trackWidth: 13,
     inspiration: "high-speed",
     turns: [
-      T(1620, 120, 22, 1, "Variante 1"),
+      T(1620, 120, 22, 1, "Variante del Rettifilo"),
       T(1690, 185, 26, 1),
-      T(1900, 200, 150, 1, "Grande"),
+      T(1900, 200, 150, 1, "Curva Grande"),
       T(1990, 460, 170, 1),
-      T(1920, 780, 24, 2, "Variante 2"),
+      T(1920, 780, 24, 2, "Variante della Roggia"),
       T(1840, 815, 26, 2),
       T(1420, 1040, 120, 2, "Lesmo 1"),
       T(900, 1060, 130, 2, "Lesmo 2"),
@@ -52,35 +80,19 @@ export const CIRCUITS: Circuit[] = [
     ],
   },
   {
-    id: "street-crown",
-    name: "Street Crown",
-    tagline: "Compact, narrow, technical urban circuit.",
+    id: "monaco", series: "f1",
+    name: "Circuit de Monaco", location: "Monte Carlo, Monaco",
+    tagline: "Compact, narrow, technical street circuit.",
+    character: ["Street", "Narrow", "Technical"],
     trackWidth: 11,
     inspiration: "street-technical",
-    turns: [
-      T(960, 80, 28, 1, "Harbour"),
-      T(960, 230, 50, 1),
-      T(1150, 250, 22, 1, "Casino"),
-      T(1130, 430, 24, 1),
-      T(1010, 450, 22, 1, "Mirabeau"),
-      T(1050, 610, 16, 2, "Loews"),
-      T(930, 520, 24, 2),
-      T(870, 690, 40, 2, "Tunnel"),
-      T(640, 760, 30, 2, "Chicane"),
-      T(600, 720, 30, 2),
-      T(380, 780, 18, 2, "Pool"),
-      T(340, 640, 30, 3),
-      T(460, 520, 45, 3, "Rascasse"),
-      T(440, 360, 30, 3),
-      T(250, 330, 26, 3, "Sainte"),
-      T(200, 150, 24, 3),
-      T(300, 80, 60, 3),
-    ],
+    turns: monaco,
   },
   {
-    id: "figure-eight",
-    name: "Figure Eight",
-    tagline: "Flowing direction changes and linked technical sequences.",
+    id: "suzuka", series: "f1",
+    name: "Suzuka Circuit", location: "Suzuka, Japan",
+    tagline: "Flowing direction changes and a figure-eight crossover.",
+    character: ["Flowing", "Esses", "High-speed technical"],
     trackWidth: 13,
     inspiration: "flowing-technical",
     turns: [
@@ -95,13 +107,146 @@ export const CIRCUITS: Circuit[] = [
       T(420, 840, 150, 2),
       T(900, 900, 220, 3, "Crossover"),
       T(1340, 990, 70, 3),
-      T(1580, 950, 34, 3, "Casio"),
+      T(1580, 950, 34, 3, "Casio Triangle"),
       T(1520, 820, 36, 3),
       T(1100, 620, 200, 3),
       T(700, 170, 190, 3),
       T(1020, 60, 250, 3),
     ],
   },
+
+  // ---- Formula E ----
+  {
+    id: "monaco-fe", series: "fe",
+    name: "Circuit de Monaco", location: "Monte Carlo, Monaco",
+    tagline: "The full street layout at electric single-seater pace.",
+    character: ["Street", "Compact", "Technical"],
+    trackWidth: 11,
+    inspiration: "street-technical",
+    turns: monaco,
+  },
+  {
+    id: "berlin-tempelhof", series: "fe",
+    name: "Tempelhof Airport Street Circuit", location: "Berlin, Germany",
+    tagline: "Wide airport apron, heavy braking into technical corners.",
+    character: ["Technical", "Wide", "Heavy braking"],
+    trackWidth: 14,
+    inspiration: "street-technical",
+    turns: scale(1.15, [
+      T(120, 80, 60, 1),
+      T(700, 60, 30, 1),
+      T(760, 200, 40, 1),
+      T(620, 300, 24, 2),
+      T(680, 420, 28, 2),
+      T(540, 470, 40, 2),
+      T(380, 380, 22, 2),
+      T(330, 470, 36, 3),
+      T(120, 440, 30, 3),
+      T(40, 300, 60, 3),
+    ]),
+  },
+  {
+    id: "tokyo", series: "fe",
+    name: "Tokyo Street Circuit", location: "Tokyo, Japan",
+    tagline: "Modern street circuit of right angles and stop-start braking.",
+    character: ["Street", "Stop-start", "Modern"],
+    trackWidth: 12,
+    inspiration: "street-technical",
+    turns: [
+      T(100, 100, 30, 1),
+      T(600, 80, 26, 1),
+      T(640, 240, 20, 1),
+      T(900, 260, 30, 1),
+      T(940, 420, 18, 2),
+      T(760, 470, 24, 2),
+      T(720, 620, 22, 2),
+      T(480, 640, 28, 2),
+      T(440, 500, 20, 2),
+      T(300, 520, 20, 3),
+      T(260, 660, 26, 3),
+      T(60, 640, 24, 3),
+      T(30, 380, 40, 3),
+      T(80, 250, 50, 3),
+    ],
+  },
+
+  // ---- MotoGP ----
+  {
+    id: "mugello", series: "motogp",
+    name: "Autodromo Internazionale del Mugello", location: "Mugello, Italy",
+    tagline: "A long main straight into fast, flowing hillside sequences.",
+    character: ["Fast", "Flowing", "Elevation"],
+    trackWidth: 14,
+    inspiration: "flowing-technical",
+    turns: scale(1.18, [
+      T(1700, 120, 60, 1, "San Donato"),
+      T(1780, 380, 90, 1, "Luco"),
+      T(1560, 520, 110, 1, "Poggio Secco"),
+      T(1620, 760, 90, 1, "Materassi"),
+      T(1350, 820, 100, 2, "Borgo San Lorenzo"),
+      T(1120, 640, 130, 2, "Casanova"),
+      T(880, 760, 120, 2, "Savelli"),
+      T(600, 700, 200, 2, "Arrabbiata 1"),
+      T(360, 560, 180, 2, "Arrabbiata 2"),
+      T(150, 640, 90, 3, "Scarperia"),
+      T(60, 480, 80, 3, "Palagio"),
+      T(200, 300, 110, 3, "Correntaio"),
+      T(120, 120, 70, 3, "Biondetti"),
+      T(420, 60, 120, 3, "Bucine"),
+      T(600, 100, 300, 3),
+    ]),
+  },
+  {
+    id: "assen", series: "motogp",
+    name: "TT Circuit Assen", location: "Assen, Netherlands",
+    tagline: "Rhythmic, high-speed corner sequences with hardly a pause.",
+    character: ["Flowing", "High speed", "Rhythmic"],
+    trackWidth: 14,
+    inspiration: "flowing-technical",
+    turns: scale(1.12, [
+      T(320, 130, 80, 1, "Haarbocht"),
+      T(760, 60, 140, 1, "Madijk"),
+      T(1080, 150, 90, 1, "Ossebroeken"),
+      T(1300, 60, 110, 1, "Strubben"),
+      T(1570, 220, 60, 1),
+      T(1490, 450, 150, 2, "Ruskenhoek"),
+      T(1620, 690, 90, 2, "Stekkenwal"),
+      T(1350, 820, 110, 2, "Mandeveen"),
+      T(1080, 670, 130, 2, "Duikersloot"),
+      T(820, 780, 120, 2, "Meeuwenmeer"),
+      T(540, 690, 160, 3, "Hoge Heide"),
+      T(320, 820, 90, 3, "Ramshoek"),
+      T(90, 650, 70, 3, "GT Chicane"),
+      T(60, 320, 120, 3),
+    ]),
+  },
+  {
+    id: "phillip-island", series: "motogp",
+    name: "Phillip Island Grand Prix Circuit", location: "Phillip Island, Australia",
+    tagline: "Fast, open sweepers that reward commitment.",
+    character: ["Fast", "Open", "High-commitment corners"],
+    trackWidth: 13,
+    inspiration: "high-speed",
+    turns: scale(1.28, [
+      T(1450, 200, 140, 1, "Doohan"),
+      T(1300, 460, 120, 1, "Southern Loop"),
+      T(1500, 640, 90, 1, "Stoner"),
+      T(1150, 760, 200, 2, "Honda"),
+      T(800, 700, 70, 2, "Siberia"),
+      T(500, 780, 180, 2, "Hayshed"),
+      T(260, 660, 120, 3, "Lukey Heights"),
+      T(120, 480, 45, 3, "MG"),
+      T(80, 300, 160, 3),
+      T(300, 120, 220, 3),
+      T(560, 60, 260, 3),
+    ]),
+  },
 ];
 
 export const DEFAULT_CIRCUIT = CIRCUITS[0];
+export const circuitById = (id: string) => CIRCUITS.find((c) => c.id === id);
+
+/** The Reference Library: three references per discipline, in card order. Silver Fields is the default workspace, not a library entry. */
+export const REFERENCES: Record<SeriesId, Circuit[]> = Object.fromEntries(
+  SERIES_IDS.map((s) => [s, CIRCUITS.filter((c) => c.series === s && c.location)]),
+) as Record<SeriesId, Circuit[]>;

@@ -1,20 +1,36 @@
 "use client";
-import { useEffect } from "react";
-import { buildGeometry } from "@/lib/circuit";
-import { CIRCUITS } from "@/lib/circuits";
+import { useEffect, useState } from "react";
+import Image from "next/image";
 import { deleteTurn, setLocks } from "@/lib/moves";
-import { commit, getState, hydrate, loadCircuit, redo, select, undo, useStore } from "@/lib/store";
-import { exportJSON, exportSVG } from "@/lib/export";
-import { download } from "@/lib/tools";
+import { seriesById } from "@/lib/series";
+import { commit, getState, hydrate, redo, select, undo, useStore } from "@/lib/store";
 import { registerWebMCP } from "@/lib/webmcp";
+import { Redo2, Undo2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Kbd } from "@/components/ui/kbd";
+import { Separator } from "@/components/ui/separator";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Canvas } from "./Canvas";
+import { ExportDialog } from "./ExportDialog";
 import { Panel } from "./Panel";
+import { Present } from "./Present";
+import { ReferenceLibrary, SERIES_LOGO } from "./ReferenceLibrary";
+
+const AGENT_TEXT = {
+  connected: { label: "Agent connected", tip: "WebMCP tools registered. An agent in this browser reads and edits this live circuit with you." },
+  unavailable: { label: "WebMCP not detected", tip: "Open in ChatGPT's in-app browser or Chrome 149+ with chrome://flags/#enable-webmcp-testing to let an agent design with you." },
+  unknown: { label: "WebMCP", tip: "Checking for a WebMCP agent." },
+} as const;
 
 export function Workspace() {
   const circuit = useStore((s) => s.circuit);
   const agent = useStore((s) => s.agent);
   const canUndo = useStore((s) => s.past.length > 0);
   const canRedo = useStore((s) => s.future.length > 0);
+  const [library, setLibrary] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [present, setPresent] = useState(false);
+  const series = seriesById(circuit.series);
 
   useEffect(() => registerWebMCP(), []);
   useEffect(() => { hydrate(); }, []); // brief and versions from localStorage, after mount so the first render matches the server
@@ -35,46 +51,50 @@ export function Workspace() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  const exportFile = (fmt: "json" | "svg") => {
-    const { circuit: c, analysis } = getState();
-    download(`${c.id}.${fmt}`, fmt === "svg" ? exportSVG(c, buildGeometry(c.turns)) : exportJSON(c, analysis), fmt === "svg" ? "image/svg+xml" : "application/json");
-  };
+  if (present) return <Present onExit={() => setPresent(false)} />;
 
   return (
     <div className="grid h-full grid-rows-[48px_1fr] bg-bg text-fg">
-      <header className="flex items-center gap-4 border-b border-line px-4">
+      <header className="flex items-center gap-3 border-b border-line px-4">
         <div className="flex items-baseline gap-2">
           <span className="display text-[20px] leading-none tracking-[0.04em]">NotASprint</span>
-          <span className="label hidden sm:inline">Circuit Design Lab</span>
+          <span className="label hidden lg:inline">Circuit Design Lab</span>
         </div>
-        <div className="h-4 w-px bg-line" />
-        <label className="flex items-center gap-2">
-          <span className="label">Reference</span>
-          <select value={circuit.id} onChange={(e) => loadCircuit(e.target.value)} aria-label="Reference layout" title="Example starting layouts. Design inspirations are applied to the live circuit from the panel or by the agent.">
-            {CIRCUITS.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
-        </label>
-        <div className="flex items-center gap-1">
-          <button className="btn" onClick={() => undo()} disabled={!canUndo} title="Undo (⌘Z)">Undo</button>
-          <button className="btn" onClick={() => redo()} disabled={!canRedo} title="Redo (⇧⌘Z)">Redo</button>
+        <Separator orientation="vertical" className="h-4" />
+        <div className="hidden min-w-0 items-center gap-1.5 text-[12px] text-fg-dim md:flex">
+          <Image src={SERIES_LOGO[circuit.series]} alt="" width={14} height={14} unoptimized className="size-3.5 shrink-0 rounded-[2px] object-contain" />
+          <span className="truncate"><span className="text-fg-muted">{series.name}</span> · {circuit.name}</span>
+        </div>
+        <div className="flex items-center">
+          <Tooltip>
+            <TooltipTrigger asChild><Button size="icon" className="rounded-r-none" onClick={() => undo()} disabled={!canUndo} aria-label="Undo"><Undo2 /></Button></TooltipTrigger>
+            <TooltipContent>Undo <Kbd>⌘Z</Kbd></TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild><Button size="icon" className="-ml-px rounded-l-none" onClick={() => redo()} disabled={!canRedo} aria-label="Redo"><Redo2 /></Button></TooltipTrigger>
+            <TooltipContent>Redo <Kbd>⇧⌘Z</Kbd></TooltipContent>
+          </Tooltip>
         </div>
         <div className="ml-auto flex items-center gap-3">
-          <span className="chip" title={agent === "connected" ? "WebMCP tools registered — an agent in this browser reads and edits this live circuit with you." : "Open in ChatGPT's in-app browser or Chrome 149+ with chrome://flags/#enable-webmcp-testing to let an agent design with you."}>
-            <span className={`dot ${agent === "connected" ? "dot-on" : ""}`} />
-            {agent === "connected" ? "Agent connected" : agent === "unavailable" ? "WebMCP not detected" : "WebMCP"}
-          </span>
-          <div className="flex items-center gap-1">
-            <button className="btn" onClick={() => exportFile("svg")}>Export SVG</button>
-            <button className="btn btn-primary" onClick={() => exportFile("json")}>Export JSON</button>
-          </div>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="chip" tabIndex={0}>
+                <span className={`dot ${agent === "connected" ? "dot-on" : ""}`} />
+                {AGENT_TEXT[agent].label}
+              </span>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" align="end">{AGENT_TEXT[agent].tip}</TooltipContent>
+          </Tooltip>
         </div>
       </header>
-      <main className="grid min-h-0 grid-cols-[1fr_minmax(320px,26%)]">
+      <main className="grid min-h-0 grid-cols-[1fr_minmax(320px,min(26%,400px))]">
         <div className="relative min-w-0 overflow-hidden">
           <Canvas />
         </div>
-        <Panel />
+        <Panel onLibrary={() => setLibrary(true)} onExport={() => setExporting(true)} onPresent={() => setPresent(true)} />
       </main>
+      <ReferenceLibrary open={library} onOpenChange={setLibrary} />
+      <ExportDialog open={exporting} onOpenChange={setExporting} />
     </div>
   );
 }

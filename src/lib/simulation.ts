@@ -2,7 +2,8 @@
 // profile on a single racing line, with per-driver variance, following distance, overtaking attempts in braking
 // zones and occasional contact. The output is a set of DESIGN SIGNALS — where cars bunch, where they pass, where
 // speed differentials pile up — not a prediction of real racing. Pure and deterministic for a given seed.
-import { accelAt, analyze, buildGeometry, CAR, fingerprint, KMH, speedProfile, type Circuit } from "./circuit";
+import { accelAt, analyze, buildGeometry, DS, fingerprint, KMH, speedProfile, vehicleOf, type Circuit } from "./circuit";
+import { seriesById } from "./series";
 
 export type SimParams = {
   cars: number; // 2–24
@@ -47,13 +48,13 @@ export type SimResult = {
 };
 
 export const SIM_LIMITATIONS = [
-  "Simulated design signal from a point-mass car on a single racing line; not a lap-time, safety or real-racing prediction.",
+  "Simulated design signal from a point-mass vehicle on a single racing line; not a lap-time, safety or real-racing prediction.",
   "Overtaking and contact are heuristic outcomes weighted by the analysis' overtaking score, closing speed and driver aggression.",
   "No tyre, aero, fuel, weather or elevation model. Results are for comparing design changes against each other.",
 ];
 
-// Deterministic PRNG (mulberry32) so a seed reproduces a run exactly.
-function rng(seed: number) {
+// Deterministic PRNG (mulberry32) so a seed reproduces a run exactly. Shared with the circuit generator.
+export function rng(seed: number) {
   let a = seed >>> 0;
   return () => {
     a = (a + 0x6d2b79f5) >>> 0;
@@ -81,6 +82,7 @@ export function simulate(circuit: Circuit, params: Partial<SimParams> = {}): Sim
   const g = buildGeometry(circuit.turns);
   const a = analyze(circuit, g);
   const prof = speedProfile(circuit, g);
+  const CAR = { ...vehicleOf(circuit), ds: DS };
   const m = prof.v.length, L = m * CAR.ds, n = circuit.turns.length;
   const rnd = rng(p.seed);
   const mod = (x: number) => ((x % L) + L) % L;
@@ -114,7 +116,7 @@ export function simulate(circuit: Circuit, params: Partial<SimParams> = {}): Sim
       const pos = mod(c.total);
       const gap = ahead ? (j === live.length - 1 ? mod(ahead.total) + L - pos : mod(ahead.total) - pos) : Infinity;
       const desired = prof.v[Math.min(m - 1, Math.floor(pos / CAR.ds))] * c.skill * c.lapFactor;
-      let v = c.v < desired ? Math.min(desired, c.v + accelAt(c.v) * dt) : desired;
+      let v = c.v < desired ? Math.min(desired, c.v + accelAt(c.v, CAR) * dt) : desired;
       const vAhead = ahead ? prevV.get(ahead)! : Infinity;
       const blocked = ahead !== null && gap < 7 + 0.4 * v && desired > vAhead + 1.5;
       if (ahead && gap < 7 + 0.4 * v) v = Math.min(v, gap < 7 ? vAhead * 0.97 : vAhead);
@@ -172,13 +174,14 @@ export function simulate(circuit: Circuit, params: Partial<SimParams> = {}): Sim
   };
   return {
     id: `sim-${fingerprint(circuit)}-${p.seed}-${p.cars}x${p.laps}`, circuitId: circuit.id, circuitName: circuit.name, fingerprint: fingerprint(circuit), params: p,
-    totals, turns, sectors, findings: findings(turns, sectors, totals, p), limitations: SIM_LIMITATIONS, frames: { step: dt * frameEvery, s: frames },
+    totals, turns, sectors, findings: findings(turns, sectors, totals, p, seriesById(circuit.series).noun), limitations: SIM_LIMITATIONS, frames: { step: dt * frameEvery, s: frames },
   };
 }
 
 // Turn raw signals into a short, ranked list of hypothetical findings an agent or designer can act on.
-function findings(turns: TurnSignal[], sectors: SectorSignal[], totals: SimTotals, p: SimParams): Finding[] {
+function findings(turns: TurnSignal[], sectors: SectorSignal[], totals: SimTotals, p: SimParams, noun = "car"): Finding[] {
   const out: Finding[] = [];
+  const Nouns = `${noun[0].toUpperCase()}${noun.slice(1)}s`;
   const label = (t: TurnSignal) => `Turn ${t.turn}${t.name ? ` (${t.name})` : ""}`;
   const held = (t: TurnSignal) => (t.arrivals ? t.congestion / t.arrivals : 0);
   const passes = (k: number) => `${k} pass${k === 1 ? "" : "es"}`;
@@ -189,7 +192,7 @@ function findings(turns: TurnSignal[], sectors: SectorSignal[], totals: SimTotal
     if (r >= 0.25 && t.overtakes <= t.congestion * 0.25)
       out.push({ kind: "bunching", severity: r >= 0.4 && t.overtakes <= t.congestion * 0.15 ? "high" : "medium", turns: [t.turn], sector: t.sector, text: `Repeated bunching before ${label(t)}: ${t.congestion} of ${t.arrivals} arrivals held up, only ${passes(t.overtakes)}.` });
     if (t.contacts >= 2) out.push({ kind: "contact", severity: t.contacts >= 4 ? "high" : "medium", turns: [t.turn], sector: t.sector, text: `${label(t)} produced ${t.contacts} simulated contact events.` });
-    if (t.closingKmh >= 60 && r >= 0.2) out.push({ kind: "speed-differential", severity: "medium", turns: [t.turn], sector: t.sector, text: `High speed-differential braking zone into ${label(t)}: held-up cars arrived ~${t.closingKmh} km/h faster than the car ahead.` });
+    if (t.closingKmh >= 60 && r >= 0.2) out.push({ kind: "speed-differential", severity: "medium", turns: [t.turn], sector: t.sector, text: `High speed-differential braking zone into ${label(t)}: held-up ${noun}s arrived ~${t.closingKmh} km/h faster than the ${noun} ahead.` });
     if (t.overtakingScore >= 70 && t.overtakes === 0) out.push({ kind: "no-passing", severity: "medium", turns: [t.turn], sector: t.sector, text: `${label(t)} scores ${t.overtakingScore} for overtaking on paper but produced no simulated passes.` });
   }
   // Runs of three or more consecutive turns where the field arrives nose-to-tail and nobody gets by.
@@ -198,7 +201,7 @@ function findings(turns: TurnSignal[], sectors: SectorSignal[], totals: SimTotal
     let j = i;
     while (j < turns.length && stuck(turns[j])) j++;
     const run = turns.slice(i, j), k = run.reduce((x, t) => x + t.overtakes, 0);
-    if (run.length >= 3) out.push({ kind: "packed", severity: "medium", turns: run.map((t) => t.turn), text: `Cars stayed closely packed through Turns ${run[0].turn}–${run[run.length - 1].turn} with little overtaking (${passes(k)}).` });
+    if (run.length >= 3) out.push({ kind: "packed", severity: "medium", turns: run.map((t) => t.turn), text: `${Nouns} stayed closely packed through Turns ${run[0].turn}–${run[run.length - 1].turn} with little overtaking (${passes(k)}).` });
     i = j + 1;
   }
   const best = [...sectors].sort((x, y) => y.overtakes - x.overtakes)[0];

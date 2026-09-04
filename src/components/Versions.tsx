@@ -1,12 +1,16 @@
 "use client";
 import { useState } from "react";
+import { X } from "lucide-react";
 import { compactResult } from "@/lib/simulation";
 import { deleteVersion, restoreVersion, saveVersion, setCompare, useStore } from "@/lib/store";
+import { cn } from "@/lib/utils";
 import { compareSnapshots } from "@/lib/versions";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 const time = (at: number) => new Date(at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
-/** Named design milestones with a compare-against-current view. Complements undo; never replaces it. */
+/** Snapshots: named design milestones with a compare-against-current view. Complements undo; never replaces it. (Internally still "versions".) */
 export function Versions() {
   const versions = useStore((s) => s.versions);
   const compare = useStore((s) => s.compare);
@@ -19,31 +23,32 @@ export function Versions() {
   const target = versions.find((v) => v.id === compare);
   // Built from the subscribed live state so the table follows every edit — the same view the agent compares against.
   const cmp = target ? compareSnapshots(target, { id: "current", name: "Current", circuit, analysis, brief, simulation: simulation ? compactResult(simulation) : null }) : null;
+  const save = () => { saveVersion(name || suggested); setName(""); };
 
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-1.5">
-        <input value={name} onChange={(e) => setName(e.target.value)} placeholder={suggested || `V${versions.length + 1}`} className="field min-w-0 flex-1" onKeyDown={(e) => { if (e.key === "Enter") { saveVersion(name || suggested); setName(""); } }} />
-        <button className="btn" onClick={() => { saveVersion(name || suggested); setName(""); }}>Save version</button>
+        <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={suggested || `Snapshot ${versions.length + 1}`} aria-label="Snapshot name" className="flex-1" onKeyDown={(e) => { if (e.key === "Enter") save(); }} />
+        <Button onClick={save}>Save snapshot</Button>
       </div>
-      {!versions.length && <div className="text-[12px] text-fg-dim">Save a milestone to compare designs later. Undo stays separate for small edits.</div>}
+      {!versions.length && <div className="text-[12px] text-fg-dim">Save a snapshot of this concept to compare or return to it later. Undo stays separate for small edits.</div>}
       {versions.map((v) => (
-        <div key={v.id} className="mono text-[11px]">
-          <div className="flex items-baseline gap-2">
-            <span className="display shrink-0 text-[15px] leading-none text-fg">{v.id.toUpperCase()}</span>
+        <div key={v.id} className={cn("-mx-2 rounded-sm px-2 py-1 text-[12px]", compare === v.id && "bg-surface-2")}>
+          <div className="flex items-center gap-2">
+            <span className="display w-[2.4ch] shrink-0 text-[15px] leading-none text-fg">{v.id.toUpperCase()}</span>
             <span className="min-w-0 flex-1 truncate text-fg" title={`${v.name} · saved ${time(v.at)} by ${v.source}`}>{v.name}</span>
-            <button onClick={() => setCompare(compare === v.id ? null : v.id)} className={`shrink-0 underline decoration-line-strong underline-offset-2 hover:text-fg ${compare === v.id ? "text-fg" : "text-fg-muted"}`}>{compare === v.id ? "Comparing" : "Compare"}</button>
-            <button onClick={() => restoreVersion(v.id)} className="shrink-0 text-fg-muted underline decoration-line-strong underline-offset-2 hover:text-fg">Restore</button>
-            <button onClick={() => deleteVersion(v.id)} title="Delete version" className="shrink-0 text-fg-dim hover:text-fg">×</button>
+            <Button variant="link" className="text-[11px]" data-on={compare === v.id} onClick={() => setCompare(compare === v.id ? null : v.id)}>{compare === v.id ? "Comparing" : "Compare"}</Button>
+            <Button variant="link" className="text-[11px]" onClick={() => restoreVersion(v.id)}>Restore</Button>
+            <Button variant="ghost" size="icon-sm" onClick={() => deleteVersion(v.id)} aria-label={`Delete snapshot ${v.id.toUpperCase()}`}><X className="size-3" /></Button>
           </div>
-          <div className="truncate pl-[calc(2.2ch+8px)] text-fg-dim">{(v.analysis.length / 1000).toFixed(2)} km · {v.analysis.turnCount} turns · {v.analysis.overtakingOpportunities.length} strong{v.simulation ? ` · sim ${v.simulation.totals.congestion} held up · ${v.simulation.totals.overtakes} passes` : " · no simulation"}</div>
+          <div className="mono truncate pl-[calc(2.4ch+8px)] text-[11px] text-fg-dim">{(v.analysis.length / 1000).toFixed(2)} km · {v.analysis.turnCount} turns · {v.analysis.overtakingOpportunities.length} strong{v.simulation ? ` · sim ${v.simulation.totals.congestion} held up · ${v.simulation.totals.overtakes} passes` : " · no simulation"}</div>
         </div>
       ))}
       {cmp && target && (
         <div className="border-t border-line pt-2">
-          <div className="mono mb-1 flex items-baseline justify-between text-[11px]">
-            <span className="text-fg-muted"><span className="text-fg">{target.id.toUpperCase()}</span> → <span className="text-fg">CURRENT</span> · dashed on canvas</span>
-            <button onClick={() => setCompare(null)} className="text-fg-dim hover:text-fg">Close</button>
+          <div className="mb-1 flex items-center justify-between text-[12px]">
+            <span className="text-fg-muted"><span className="display text-[13px] text-fg">{target.id.toUpperCase()}</span> → <span className="display text-[13px] text-fg">Current</span> · dashed on the canvas</span>
+            <Button variant="link" className="text-[11px]" onClick={() => setCompare(null)}>Close</Button>
           </div>
           <table className="mono w-full text-[11px]">
             <tbody>
@@ -52,7 +57,7 @@ export function Versions() {
                   <td className="py-0.5 text-fg-muted">{r.label}</td>
                   <td className="py-0.5 text-right text-fg-muted">{r.a}</td>
                   <td className="w-6 py-0.5 text-center text-fg-dim">→</td>
-                  <td className={`py-0.5 text-right ${r.a === r.b ? "text-fg-muted" : "text-fg"}`}>{r.b}</td>
+                  <td className={cn("py-0.5 text-right", r.a === r.b ? "text-fg-muted" : "text-fg")}>{r.b}</td>
                 </tr>
               ))}
               {cmp.sectors.filter((s) => s.a !== s.b).map((s) => (
@@ -65,7 +70,7 @@ export function Versions() {
               ))}
             </tbody>
           </table>
-          {!cmp.simulation && <div className="mono mt-1 text-[11px] text-fg-dim">Run a simulation on both to compare race-flow signals</div>}
+          {!cmp.simulation && <div className="mt-1 text-[11px] text-fg-dim">Run a simulation on both to compare race-flow signals</div>}
         </div>
       )}
     </div>

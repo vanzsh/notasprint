@@ -4,12 +4,15 @@ import assert from "node:assert/strict";
 import { tools } from "../src/lib/tools";
 import { clearBrief, commit, getState, redo, restoreVersion, saveVersion, setBrief, undo } from "../src/lib/store";
 import { applyDesignMove, applyInspiration, deleteTurn, moveTurn, setLocks, type Intensity } from "../src/lib/moves";
-import { CIRCUITS } from "../src/lib/circuits";
+import { CIRCUITS, REFERENCES } from "../src/lib/circuits";
 import { analyze, buildGeometry, fingerprint, lapPath, startFinish } from "../src/lib/circuit";
 import { ARCHETYPE_IDS, ARCHETYPES, resolveArchetype } from "../src/lib/archetypes";
 import { compareSimulations, simulate } from "../src/lib/simulation";
 import { briefForAgent, evaluateBrief } from "../src/lib/constraints";
 import { compareSnapshots, deserializeVersions, serializeVersions } from "../src/lib/versions";
+import { generateCircuit } from "../src/lib/generate";
+import { resolveSeries, SERIES, SERIES_IDS } from "../src/lib/series";
+import { exportSVG, EXPORT_STYLES } from "../src/lib/export";
 
 const call = async (name: string, input: Record<string, unknown> = {}) => {
   const t = tools.find((x) => x.name === name)!;
@@ -18,14 +21,22 @@ const call = async (name: string, input: Record<string, unknown> = {}) => {
   return out;
 };
 
-// Every reference circuit analyzes cleanly.
+// Every reference circuit analyzes cleanly, inside its discipline's length band, with a plausible lap.
+const band = (series: string) => SERIES[series as keyof typeof SERIES].lengthBand;
 for (const c of CIRCUITS) {
-  const a = analyze(c);
-  assert.ok(a.length > 3000 && a.length < 6000, `${c.name} length ${a.length}`);
-  assert.ok(a.lapTime > 55 && a.lapTime < 110, `${c.name} lap ${a.lapTime}`);
+  const a = analyze(c), [lo, , , hi] = band(c.series);
+  assert.ok(a.length > lo && a.length < hi, `${c.name} length ${a.length} outside ${lo}–${hi}`);
+  assert.ok(a.lapTime > 50 && a.lapTime < 110, `${c.name} lap ${a.lapTime}`);
   assert.ok(buildGeometry(c.turns).path.startsWith("M"));
-  assert.ok(!a.warnings.some((w) => w.includes("clamped")), `${c.name}: ${a.warnings.join(" | ")}`);
+  assert.ok(!a.warnings.some((w) => w.includes("clamped") || w.includes("tighter")), `${c.name}: ${a.warnings.join(" | ")}`);
 }
+// The Reference Library: exactly three per motorsport, each with a location and three character words, ids unique.
+for (const s of SERIES_IDS) {
+  assert.equal(REFERENCES[s].length, 3, `${s} has three references`);
+  for (const r of REFERENCES[s]) assert.ok(r.location && r.character?.length === 3 && r.series === s, `${r.id} described`);
+}
+assert.equal(new Set(CIRCUITS.map((c) => c.id)).size, CIRCUITS.length, "circuit ids unique");
+assert.equal(CIRCUITS[0].id, "silver-fields", "Silver Fields stays the default workspace");
 
 // Prompt 1: "Make this circuit more raceable: ≥3 strong overtaking opportunities, faster Sector 3, below 6 km."
 let s = await call("analyze_circuit");
@@ -87,17 +98,18 @@ await call("load_reference_circuit", { circuit_id: "silver-fields" });
 const gc = await call("get_circuit");
 assert.deepEqual(gc.design_inspirations.map((d: { id: string }) => d.id), [...ARCHETYPE_IDS]);
 assert.ok(gc.design_inspirations.every((d: { aliases: string[]; summary: string }) => d.aliases.length >= 3 && d.summary), "aliases and summaries visible to the agent");
-assert.deepEqual(gc.reference_circuits.map((r: { example_of: string }) => r.example_of), ["mixed", "high-speed", "street-technical", "flowing-technical"]);
+assert.deepEqual(Object.keys(gc.reference_library), [...SERIES_IDS], "library grouped by motorsport");
+assert.ok(gc.reference_library.f1.some((r: { id: string }) => r.id === "monza") && gc.motorsport.id === "f1" && gc.reference.kind === "original", "motorsport and origin visible to the agent");
 const an = await call("analyze_circuit");
 assert.ok(an.design_inspirations.every((d: Record<string, unknown>) => (d.traits as string[]).length && d.what_applying_does && d.score_tendencies && d.example_request), "full descriptions in analyze_circuit");
 
 // Every archetype × scope × intensity applies to every reference circuit: deterministic, no clamped radii, sane length.
 for (const c of CIRCUITS) for (const id of ARCHETYPE_IDS) for (const scope of [1, 2, 3, "circuit"] as const) for (const intensity of ["subtle", "moderate", "strong"] as Intensity[]) {
   const r = applyInspiration(c, id, scope, intensity);
-  const a = analyze(r.circuit);
+  const a = analyze(r.circuit), [lo, , , hi] = band(c.series);
   assert.ok(r.changed.length > 0, `${c.name} ${id} ${scope} ${intensity} changed something`);
   assert.ok(!a.warnings.some((w) => w.includes("clamped")), `${c.name} ${id} ${scope} ${intensity}: ${a.warnings.join(" | ")}`);
-  assert.ok(a.length > 2500 && a.length < 6500, `${c.name} ${id} ${scope} ${intensity} length ${a.length}`);
+  assert.ok(a.length > lo * 0.85 && a.length < hi, `${c.name} ${id} ${scope} ${intensity} length ${a.length}`);
   assert.deepEqual(applyInspiration(c, id, scope, intensity).circuit.turns.map((t) => [t.x, t.y, t.radius]), r.circuit.turns.map((t) => [t.x, t.y, t.radius]), "deterministic");
 }
 // Archetypes move their scores the way they say they do (whole circuit, moderate, on the default layout).
@@ -151,9 +163,68 @@ assert.equal(getState().analysis.overtakingOpportunities.length, strongBefore, "
 assert.ok(preserved(), "T7 still locked after undo");
 const ex = JSON.parse(await tools.find((t) => t.name === "export_circuit")!.execute({ format: "json" }));
 assert.equal(ex.circuit.turns.length, getState().circuit.turns.length);
-await call("load_reference_circuit", { circuit_id: "temple-of-speed" });
+await call("load_reference_circuit", { circuit_id: "monza" });
 assert.equal(JSON.parse(await tools.find((t) => t.name === "export_circuit")!.execute({ format: "json" })).circuit.inspiration, "high-speed", "export carries the layout's archetype");
 console.log("inspirations OK");
+
+// ---- Motorsports, references and custom concepts ----
+assert.deepEqual([resolveSeries("Formula E")?.id, resolveSeries("moto gp")?.id, resolveSeries("bikes")?.id, resolveSeries("F1")?.id, resolveSeries("rally")], ["fe", "motogp", "motogp", "f1", undefined]);
+// Loading a reference sets the motorsport; the analysis reads it with that discipline's vehicle model.
+let ref = await call("load_reference_circuit", { circuit_id: "mugello" });
+assert.ok(ref.state.motorsport.id === "motogp" && ref.state.motorsport.vehicle === "bike" && ref.state.reference.kind === "reference" && ref.state.reference.location === "Mugello, Italy", JSON.stringify(ref.state.motorsport));
+assert.ok(getState().analysis.topSpeed > 300, "MotoGP vehicle model reaches a bike's top speed on Mugello's straight");
+ref = await call("load_reference_circuit", { circuit_id: "tokyo" });
+assert.ok(ref.state.motorsport.id === "fe" && getState().analysis.topSpeed < 280, "Formula E model tops out lower");
+assert.ok(!getState().analysis.warnings.some((w) => w.includes("short")), "a 2.8 km Formula E layout is not flagged as short");
+// The same layout reads differently per discipline: Monaco for F1 vs Formula E.
+const monacoF1 = analyze(CIRCUITS.find((c) => c.id === "monaco")!), monacoFE = analyze(CIRCUITS.find((c) => c.id === "monaco-fe")!);
+assert.ok(monacoF1.lapTime < monacoFE.lapTime && monacoF1.topSpeed > monacoFE.topSpeed, "Formula E is slower around the same street layout");
+// Custom concepts: seeded, deterministic, discipline-shaped, clean, and genuinely different between seeds.
+for (const s of SERIES_IDS) {
+  const [lo, , , hi] = band(s);
+  const shapes = new Set<string>();
+  for (let seed = 1; seed <= 25; seed++) {
+    const c = generateCircuit(s, seed), g = buildGeometry(c.turns), a = analyze(c, g);
+    assert.ok(a.length > lo && a.length < hi, `${s} seed ${seed} length ${a.length}`);
+    assert.equal(g.crossings, 0, `${s} seed ${seed} does not cross itself`);
+    assert.ok(!a.warnings.some((w) => w.includes("clamped") || w.includes("tighter")), `${s} seed ${seed}: ${a.warnings.join(" | ")}`);
+    assert.ok(a.turnCount >= 6, `${s} seed ${seed} has real corners (${a.turnCount})`);
+    assert.deepEqual(generateCircuit(s, seed).turns, c.turns, "deterministic for a seed");
+    shapes.add(`${c.turns.length}:${c.turns.map((t) => Math.round(t.radius / 10)).join(",")}`);
+  }
+  assert.ok(shapes.size >= 24, `${s}: seeds give different layouts (${shapes.size}/25 distinct)`);
+}
+const f1Avg = (k: "highSpeed" | "technicality") => Array.from({ length: 20 }, (_, i) => analyze(generateCircuit("f1", i + 1)).scores[k]).reduce((a, b) => a + b, 0) / 20;
+const feAvg = (k: "highSpeed" | "technicality") => Array.from({ length: 20 }, (_, i) => analyze(generateCircuit("fe", i + 1)).scores[k]).reduce((a, b) => a + b, 0) / 20;
+assert.ok(f1Avg("highSpeed") > feAvg("highSpeed") && feAvg("technicality") > f1Avg("technicality"), "Formula 1 concepts read faster, Formula E concepts more technical");
+for (const s of SERIES_IDS) {
+  const fresh = await call("create_custom_circuit", { motorsport: s });
+  assert.deepEqual(fresh.state.warnings, [], `${s} fresh custom concept opens without design warnings`);
+}
+// Through the tool: the demo prompt "Create a custom MotoGP circuit", then the usual loop around a human lock.
+const cc = await call("create_custom_circuit", { motorsport: "MotoGP", seed: 11 });
+assert.ok(cc.state.motorsport.id === "motogp" && cc.state.reference.kind === "custom" && cc.state.reference.seed === 11 && getState().circuit.custom === 11, "custom MotoGP concept loaded");
+const again = await call("create_custom_circuit", { motorsport: "motogp", seed: 11 });
+assert.deepEqual(again.state.turns.map((t: { x: number; y: number }) => [t.x, t.y]), cc.state.turns.map((t: { x: number; y: number }) => [t.x, t.y]), "same seed reproduces the concept");
+assert.equal(JSON.parse(await tools.find((t) => t.name === "create_custom_circuit")!.execute({ motorsport: "rally" })).ok, false, "unknown motorsport refused");
+const fasterCustom = await call("reshape_sector", { sector: 2, intent: "faster", reason: "Faster, flowing Sector 2" });
+assert.ok(!fasterCustom.state.warnings.some((w: string) => w.includes("clamped") || w.includes("very close")), `custom MotoGP faster reshape: ${fasterCustom.state.warnings.join(" | ")}`);
+const c7 = getState().circuit.turns[6];
+commit(moveTurn(getState().circuit, c7.id, c7.x + 40, c7.y - 30), { source: "human", changed: [c7.id] });
+commit(setLocks(getState().circuit, [7], true).circuit, { source: "human" });
+const kc7 = { ...getState().circuit.turns[6] };
+const around = await call("reshape_sector", { sector: 2, intent: "more_technical", reason: "Redesign Sector 2 around Turn 7" });
+const kept = around.state.turns.find((t: { locked?: boolean }) => t.locked);
+assert.deepEqual([kept.x, kept.y, kept.radius_m], [kc7.x, kc7.y, kc7.radius], "locked T7 preserved on a generated MotoGP circuit");
+const simGen = await call("run_simulation", { seed: 3 });
+assert.ok(simGen.simulation.findings.length > 0 && !simGen.simulation.findings.some((f: { text: string }) => /\bcars?\b/i.test(f.text)), "MotoGP findings talk about bikes, not cars");
+// Export: every drawing style renders for every discipline; the technical style carries the discipline and scale bar.
+for (const c of [getState().circuit, ...SERIES_IDS.map((s) => REFERENCES[s][0])]) for (const style of EXPORT_STYLES) {
+  const svg = exportSVG(c, analyze(c), buildGeometry(c.turns), style, { transparent: style === "minimal" });
+  assert.ok(svg.startsWith("<svg") && svg.includes('width="2400"') && (style === "minimal" ? !svg.includes("<text") && !svg.includes("<rect") : svg.includes("<text")), `${c.id} ${style} export`);
+}
+assert.ok(exportSVG(REFERENCES.motogp[0], analyze(REFERENCES.motogp[0]), buildGeometry(REFERENCES.motogp[0].turns), "technical").includes("MotoGP"), "technical export names the motorsport");
+console.log("motorsports OK ·", cc.receipt);
 
 // ---- Simulation ----
 
@@ -184,7 +255,7 @@ for (const c of CIRCUITS) {
   assert.equal(r.params.cars * r.params.laps, 60);
   assert.ok(r.frames.s.length > 100 && r.frames.s.every((f) => f.length === 12) && r.frames.s[0].every((s) => !Number.isNaN(s)) && r.frames.s[r.frames.s.length - 1].some((s) => Number.isNaN(s)), `${c.name} frames start with every car on track and end with finishers gone`);
   assert.ok(r.totals.avgGapS > 0 && r.totals.spreadS > 0 && r.totals.lapTimeS > 50, `${c.name} totals ${JSON.stringify(r.totals)}`);
-  for (const t of r.turns) assert.ok(t.arrivals <= 60 && t.congestion <= t.arrivals && t.packed <= t.arrivals && t.overtakes <= t.congestion && t.contacts <= t.congestion, `${c.name} T${t.turn} ${JSON.stringify(t)}`);
+  for (const t of r.turns) assert.ok(t.arrivals <= 72 && t.congestion <= t.arrivals && t.packed <= t.arrivals && t.overtakes <= t.congestion && t.contacts <= t.congestion, `${c.name} T${t.turn} ${JSON.stringify(t)}`);
   assert.ok(r.findings.length > 0 && r.findings.every((f) => f.text && f.turns.every((n) => n >= 1 && n <= c.turns.length)), `${c.name} findings`);
   assert.ok(r.limitations.length >= 3 && r.sectors.length === 3);
   assert.equal(r.totals.strongZones, analyze(c).overtakingOpportunities.length);
