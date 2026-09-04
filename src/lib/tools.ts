@@ -11,18 +11,30 @@ import { clearBrief, commit, getState, loadCircuit, loadCustom, restoreVersion, 
 import { compareSnapshots, type Version } from "./versions";
 import { EXPORT_FORMATS, EXPORT_STYLES, exportJSON, exportSVG, svgToPng, type ExportFormat, type ExportStyle } from "./export";
 
+/**
+ * WebMCP ToolAnnotations as currently specified (webmachinelearning/webmcp § 4.2.1): readOnlyHint,
+ * untrustedContentHint, consequentialHint — all booleans defaulting to false. Nothing else (no MCP-server
+ * destructiveHint / idempotentHint / openWorldHint: browsers drop unknown members).
+ *
+ * readOnlyHint is required here on purpose: a tool registered without an annotations object is reported by the
+ * browser with `annotations: undefined`, and ChatGPT Site Tools then counts it as neither read nor write. Every
+ * NotASprint tool states explicitly whether it mutates the live circuit.
+ */
+export type ToolAnnotations = { readOnlyHint: boolean; untrustedContentHint?: boolean; consequentialHint?: boolean };
 export type Tool = {
   name: string;
   description: string;
   inputSchema: Record<string, unknown>;
-  annotations?: { readOnlyHint?: boolean; destructiveHint?: boolean };
+  annotations: ToolAnnotations;
   execute: (input: Record<string, unknown>) => Promise<string>;
 };
+const READ: ToolAnnotations = { readOnlyHint: true };
+const WRITE: ToolAnnotations = { readOnlyHint: false };
 
 const intensity = { type: "string", enum: ["subtle", "moderate", "strong"], description: "How far to push the change. Default moderate." };
 const inspirationParam = {
   type: "string", enum: [...ARCHETYPE_IDS],
-  description: "Design inspiration to apply. Reference phrases such as 'Monza-style' resolve to the matching id and mean its characteristics, never a real-world layout.",
+  description: "Design inspiration to apply: a set of characteristics, never a real-world layout. Phrases like 'Monza-style' resolve to the matching id.",
 };
 const r1 = (x: number) => Math.round(x * 10) / 10;
 
@@ -109,9 +121,9 @@ const run = async (fn: () => string) => {
 export const tools: Tool[] = [
   {
     name: "get_circuit",
-    description: "Read the live circuit exactly as the designer sees it: the motorsport it is designed for (Formula 1, Formula E or MotoGP, with the vehicle model the analysis uses), where it came from (a reference, a generated custom concept, or an original), every turn (position in metres, radius, sector, apex/entry speed, braking drop, approach straight, overtaking score, lock state), sector summaries, scores and warnings, plus the design inspirations and the Reference Library (three references per motorsport). Coordinates: metres, +x east, +y south; the lap runs Turn 1 → N; start/finish sits on the straight from the last turn into Turn 1. Call this first and again after the human edits something.",
+    description: "Read the live circuit as the designer sees it: motorsport and vehicle model, origin (reference, custom seed or original), every turn with position (metres, +x east, +y south), radius, sector, apex/entry speed, braking drop, approach, overtaking score and lock state, sector summaries, scores, warnings, brief status, latest simulation, design inspirations and the Reference Library. The lap runs Turn 1 → N from start/finish. Call it first and again after the human edits something.",
     inputSchema: { type: "object", properties: {} },
-    annotations: { readOnlyHint: true },
+    annotations: READ,
     execute: async () => {
       const { circuit: c, analysis: a, brief, simulation, versions, compare } = getState();
       return ok({
@@ -130,9 +142,9 @@ export const tools: Tool[] = [
   },
   {
     name: "analyze_circuit",
-    description: "Deterministic circuit design analysis with explanations: what makes each score what it is, where the strong overtaking opportunities are (heavy braking after a long approach), which turns are the best candidates to become one, sector character, geometry warnings, the design brief with each constraint's PASS / NEAR LIMIT / FAIL, the latest simulation's full findings and per-turn signals, and the design inspirations — their traits, aliases, what applying each does and which scores it moves. Use it to decide what to change and to verify a change achieved the goal.",
+    description: "Deterministic design analysis with explanations: how each score is built, the strong overtaking opportunities and the best candidates to become one, sector character, geometry warnings, each brief constraint's PASS / NEAR LIMIT / FAIL, the latest simulation's full findings and per-turn signals, and each design inspiration's traits and effect. Use it to decide what to change and to verify a change achieved the goal.",
     inputSchema: { type: "object", properties: {} },
-    annotations: { readOnlyHint: true },
+    annotations: READ,
     execute: async () => {
       const { circuit: c, analysis: a, brief, simulation } = getState();
       const cands = a.turns.filter((t) => t.overtaking < 70 && t.type !== "kink" && !t.locked).sort((p, q) => q.approach - p.approach).slice(0, 4);
@@ -178,6 +190,7 @@ export const tools: Tool[] = [
       },
       required: ["move", "turn"],
     },
+    annotations: WRITE,
     execute: async ({ move, turn, intensity, reason }) =>
       run(() => {
         const r = applyDesignMove(getState().circuit, move as (typeof DESIGN_MOVES)[number], Number(turn), intensity as Intensity);
@@ -192,12 +205,13 @@ export const tools: Tool[] = [
       properties: {
         sector: { type: "integer", enum: [1, 2, 3] },
         intent: { type: "string", enum: [...SECTOR_INTENTS], description: "Single-axis change. Omit when giving an inspiration." },
-        inspiration: { ...inspirationParam, description: `${inspirationParam.description} Takes precedence over intent.` },
+        inspiration: { ...inspirationParam, description: "Design inspiration to apply to the sector (takes precedence over intent). Phrases like 'Monza-style' resolve to the matching id." },
         intensity,
         reason: { type: "string", description: "One short sentence shown to the designer." },
       },
       required: ["sector"],
     },
+    annotations: WRITE,
     execute: async ({ sector, intent, inspiration: insp, intensity, reason }) =>
       run(() => {
         const s = Number(sector) as 1 | 2 | 3;
@@ -213,7 +227,7 @@ export const tools: Tool[] = [
   },
   {
     name: "apply_design_inspiration",
-    description: "Apply a design inspiration to the whole circuit or one sector, respecting locked turns. high-speed: open radii around the existing braking zones, drop shallow kinks, and make the corner after the longest approach a heavy braking zone. street-technical: tighten radii and insert a tight chicane on the longest straight. flowing-technical: pull radii into the 70–140 m rhythm band and insert gentle linked esses on the longest straight. The start/finish straight is always kept; locked turns are designed around. Returns a receipt and the new circuit state.",
+    description: "Apply a design inspiration to the whole circuit or one sector, designing around locked turns. high-speed: open radii, drop shallow kinks, make the corner after the longest approach a heavy braking zone. street-technical: tighten radii and insert a tight chicane on the longest straight. flowing-technical: pull radii into a 70–140 m rhythm band and insert linked esses. The start/finish straight is kept. Returns a receipt and the new state.",
     inputSchema: {
       type: "object",
       properties: {
@@ -224,6 +238,7 @@ export const tools: Tool[] = [
       },
       required: ["inspiration"],
     },
+    annotations: WRITE,
     execute: async ({ inspiration: insp, sector, intensity, reason }) =>
       run(() => {
         const a = inspiration(insp);
@@ -246,6 +261,7 @@ export const tools: Tool[] = [
       },
       required: ["edits"],
     },
+    annotations: WRITE,
     execute: async ({ edits, reason }) =>
       run(() => {
         const norm = (edits as (TurnEdit & { radius_m?: number })[]).map(({ radius_m, ...e }) => ({ ...e, radius: e.radius ?? radius_m }));
@@ -257,6 +273,7 @@ export const tools: Tool[] = [
     name: "set_turn_locks",
     description: "Lock or unlock turns. Locked turns are protected design decisions: no tool may move, resize or delete them. Use when the designer asks to keep a turn exactly as it is.",
     inputSchema: { type: "object", properties: { turns: { type: "array", items: { type: "integer" }, minItems: 1 }, locked: { type: "boolean" } }, required: ["turns", "locked"] },
+    annotations: WRITE,
     execute: async ({ turns, locked }) =>
       run(() => {
         const r = setLocks(getState().circuit, turns as number[], Boolean(locked));
@@ -265,14 +282,14 @@ export const tools: Tool[] = [
   },
   {
     name: "load_reference_circuit",
-    description: `Replace the workspace with a layout from the Reference Library. ${SERIES_IDS.map((s) => `${SERIES[s].name}: ${REFERENCES[s].map((r) => `${r.id} (${r.character?.join(", ").toLowerCase()})`).join(", ")}`).join(". ")}. silver-fields is the NotASprint original. Loading sets the motorsport to the reference's series. ${REFERENCE_NOTE} Clears history.`,
-    inputSchema: { type: "object", properties: { circuit_id: { type: "string", enum: CIRCUITS.map((c) => c.id) } }, required: ["circuit_id"] },
-    annotations: { destructiveHint: true },
+    description: `Replace the live circuit with a layout from the Reference Library (${SERIES_IDS.map((s) => `${SERIES[s].name}: ${REFERENCES[s].map((r) => r.id).join(", ")}`).join("; ")}; silver-fields is the NotASprint original). Sets the motorsport to the reference's series and clears undo history; saved snapshots stay. get_circuit lists each reference's location and character.`,
+    inputSchema: { type: "object", properties: { circuit_id: { type: "string", enum: CIRCUITS.map((c) => c.id), description: "Reference id from the Reference Library." } }, required: ["circuit_id"] },
+    annotations: WRITE,
     execute: async ({ circuit_id }) => run(() => { loadCircuit(String(circuit_id), "agent"); return afterWrite(`Loaded ${getState().circuit.name}`); }),
   },
   {
     name: "create_custom_circuit",
-    description: "Generate a fresh circuit concept for a motorsport and make it the live circuit. Formula 1: larger scale, long straights into heavy braking, several overtaking zones. Formula E: compact, technical, stop-start. MotoGP: flowing wide arcs and sustained corner sequences. Each seed gives a genuinely different layout; the same seed reproduces one. Then design on it with the usual tools. Clears history.",
+    description: "Generate a fresh circuit concept for a motorsport and make it the live circuit. Formula 1: larger scale, long straights into heavy braking. Formula E: compact, technical, stop-start. MotoGP: flowing wide arcs and sustained corner sequences. Each seed gives a different layout; the same seed reproduces one. Clears undo history; saved snapshots stay.",
     inputSchema: {
       type: "object",
       properties: {
@@ -281,7 +298,7 @@ export const tools: Tool[] = [
       },
       required: ["motorsport"],
     },
-    annotations: { destructiveHint: true },
+    annotations: WRITE,
     execute: async ({ motorsport: m, seed }) =>
       run(() => {
         const s = resolveSeries(String(m));
@@ -294,11 +311,12 @@ export const tools: Tool[] = [
     name: "undo_changes",
     description: "Undo the last N changes (yours or the designer's).",
     inputSchema: { type: "object", properties: { steps: { type: "integer", minimum: 1, default: 1 } } },
+    annotations: WRITE,
     execute: async ({ steps }) => run(() => afterWrite(`Undid ${undo(Number(steps) || 1)} change(s)`)),
   },
   {
     name: "run_simulation",
-    description: "Run a hypothetical race-flow simulation on the live circuit and return its design signals: per-turn arrivals, held-up cars, passes, simulated contacts and closing speeds; sector notes; ranked findings (repeated bunching, packed trains with no passing, contact-prone corners, high speed-differential braking zones, overtaking zones that only work on paper). If a previous run exists the response includes a before/after comparison. Read-only on the circuit; deterministic for a seed. A point-mass, single-line model — a signal for comparing design changes, not a real-world or safety prediction.",
+    description: "Run a hypothetical race-flow simulation on the live circuit and store it as the latest run: per-turn arrivals, held-up vehicles, passes, simulated contacts and closing speeds; sector notes; ranked findings (bunching, packed trains, contact-prone corners, speed-differential braking zones, paper-only overtaking zones); before/after against the previous run. Deterministic for a seed. A point-mass signal for comparing design changes, not a real-world or safety prediction.",
     inputSchema: {
       type: "object",
       properties: {
@@ -309,6 +327,7 @@ export const tools: Tool[] = [
         seed: { type: "integer", description: "Keep the same seed to compare a redesign against the previous run." },
       },
     },
+    annotations: WRITE,
     execute: async ({ cars, laps, variance, aggression, seed }) =>
       run(() => {
         const params = Object.fromEntries(Object.entries({ cars, laps, variance, aggression, seed }).filter(([, v]) => v !== undefined && v !== null).map(([k, v]) => [k, Number(v)]));
@@ -337,6 +356,7 @@ export const tools: Tool[] = [
         clear: { type: "boolean" },
       },
     },
+    annotations: WRITE,
     execute: async ({ min_length_m, max_length_m, max_turns, min_overtaking_zones, min_straight_m, profile, preserve_turns, clear }) =>
       run(() => {
         if (clear) clearBrief("agent");
@@ -365,6 +385,7 @@ export const tools: Tool[] = [
       },
       required: ["action"],
     },
+    annotations: WRITE, // list is a read, but save / restore / compare change the live design or its overlay
     execute: async ({ action, name, version_id, compare_to }) =>
       run(() => {
         const { versions } = getState();
@@ -386,9 +407,9 @@ export const tools: Tool[] = [
   },
   {
     name: "export_circuit",
-    description: "Export the current circuit. json: full definition plus analysis (also returned inline). svg / png / png-transparent: a drawing in one of four styles — technical (grid, turn numbers, sectors, braking zones), presentation (clean circuit with name and headline metrics), minimal (circuit only), analysis (presentation plus scores, sectors and overtaking zones). Triggers a download in the designer's browser.",
+    description: "Export the current circuit and save a file to the designer's device. json: definition plus analysis (also returned inline). svg / png / png-transparent: a drawing in one of four styles — technical (grid, turn numbers, sectors, braking zones), presentation (name and headline metrics), minimal (circuit only), analysis (presentation plus scores, sectors and overtaking zones). Does not change the circuit.",
     inputSchema: { type: "object", properties: { format: { type: "string", enum: [...EXPORT_FORMATS], default: "json" }, style: { type: "string", enum: [...EXPORT_STYLES], default: "technical" } } },
-    annotations: { readOnlyHint: true },
+    annotations: WRITE, // no circuit mutation, but a download is a side effect on the user's device: not "only reads data"
     execute: async ({ format, style }) => {
       const { circuit, analysis } = getState();
       const fmt = (EXPORT_FORMATS.includes(format as ExportFormat) ? format : "json") as ExportFormat;
