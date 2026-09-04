@@ -50,7 +50,7 @@ try {
   assert.equal(await evalJS<string>("document.querySelector('.chip')?.textContent?.trim()"), "Agent connected");
   // Onboarding and inspiration UI are visible without any interaction; circuit annotations render in Oxanium.
   const text0 = await evalJS<string>("document.body.innerText");
-  assert.ok(text0.includes("DESIGN LOOP") && text0.includes("INSPIRATION") && text0.includes("SIMULATE") && text0.includes("PROJECT") && text0.includes("FORMULA 1") && text0.includes("Change"), "design loop, inspiration and the circuit switcher visible");
+  assert.ok(text0.includes("DESIGN LOOP") && text0.includes("INSPIRATION") && text0.includes("SIMULATE") && text0.includes("PROJECT") && text0.includes("FORMULA 1") && text0.includes("Reference"), "design loop, inspiration and the circuit switcher visible");
   assert.match(await evalJS<string>("getComputedStyle(document.querySelector('.turn-handle text')).fontFamily"), /Oxanium/, "turn numbers use Oxanium");
   assert.doesNotMatch(await evalJS<string>("getComputedStyle(document.body).fontFamily"), /Oxanium/, "product UI keeps Geist");
 

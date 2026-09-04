@@ -70,7 +70,7 @@ export function Panel({ onLibrary, onExport, onPresent }: { onLibrary: () => voi
                 <span className="flex w-full items-center gap-2">
                   <Image src={SERIES_LOGO[circuit.series]} alt="" width={16} height={16} unoptimized className="size-4 rounded-[2px] object-contain" />
                   <span className="label text-fg-muted transition-colors duration-120 group-hover:text-fg">{series.name}</span>
-                  <span className="ml-auto flex items-center gap-1.5 text-[11px] text-fg-dim transition-colors duration-120 group-hover:text-fg">Change<ArrowLeftRight className="size-3.5" /></span>
+                  <span className="ml-auto flex items-center gap-1.5 text-[11px] text-fg-dim transition-colors duration-120 group-hover:text-fg">Reference<ArrowLeftRight className="size-3.5" /></span>
                 </span>
                 <span className="display block min-w-0 text-[26px] leading-none text-fg">{circuit.name}</span>
               </button>
@@ -433,7 +433,7 @@ function Section({ label, summary, flag, defaultOpen = false, autoOpen = false, 
     <Collapsible open={open} onOpenChange={setManual} className={major ? "border-b border-line" : "border-t border-line/70"} data-flag={flag ? "" : undefined}>
       <CollapsibleTrigger className={cn("group flex w-full items-center gap-2 text-left outline-none transition-colors duration-120 hover:bg-surface-2 focus-visible:bg-surface-2", major ? "h-9 px-4" : "h-7 pr-4 pl-4")}>
         <ChevronRight className={cn("shrink-0 text-fg-dim transition-transform duration-120 ease-out group-data-[state=open]:rotate-90", major ? "size-3.5" : "size-3")} />
-        <span className={cn("label shrink-0 transition-colors duration-120", major ? "display text-[15px] font-bold tracking-[0.06em] text-accent" : "text-[10px] group-hover:text-fg group-data-[state=open]:text-fg")}>{label}</span>
+        <span className={cn("label shrink-0 transition-colors duration-120", major ? "display text-[15px] font-bold tracking-[0.12em] text-accent" : "text-[10px] group-hover:text-fg group-data-[state=open]:text-fg")}>{label}</span>
         <span className="mono ml-auto flex min-w-0 items-baseline gap-2 text-[11px]">
           {summary && <span className={cn("truncate text-fg-muted group-data-[state=open]:hidden", !major && "text-[10px]")}>{summary}</span>}
           {flag && <span className="shrink-0 text-[10px] uppercase tracking-[0.06em] text-accent">{flag}</span>}
