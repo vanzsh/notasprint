@@ -2,7 +2,7 @@
 
 A WebMCP-native workspace where a human and an AI agent design the **same racing circuit in the same live browser tab** — for Formula 1, Formula E or MotoGP.
 
-**Live:** https://notasprint-vans-team.vercel.app
+**Live:** https://notasprint.vercel.app/
 
 The agent doesn't get a chatbot bolted onto the side. It gets the same product state you do: it reads the circuit, reshapes sectors, creates braking zones — and when you drag a corner and lock it, the agent sees that decision and designs around it.
 
