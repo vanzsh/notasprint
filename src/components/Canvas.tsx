@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Maximize, Minus, Plus } from "lucide-react";
+import { Minus, Plus, Scan } from "lucide-react";
 import { buildGeometry, fingerprint, startFinish, type Circuit } from "@/lib/circuit";
 import { insertTurnOnSegment, moveTurn } from "@/lib/moves";
 import { commit, preview, select, useStore } from "@/lib/store";
@@ -233,7 +233,7 @@ export function Canvas() {
       <div className="flex flex-col">
         <Tooltip><TooltipTrigger asChild><Button size="icon" className="rounded-b-none" onClick={() => zoomTo(v.z * ZOOM.step)} disabled={v.z >= ZOOM.max} aria-label="Zoom in"><Plus /></Button></TooltipTrigger><TooltipContent side="right">Zoom in · scroll or pinch on the canvas</TooltipContent></Tooltip>
         <Tooltip><TooltipTrigger asChild><Button size="icon" className="-mt-px rounded-none" onClick={() => zoomTo(v.z / ZOOM.step)} disabled={v.z <= ZOOM.min} aria-label="Zoom out"><Minus /></Button></TooltipTrigger><TooltipContent side="right">Zoom out</TooltipContent></Tooltip>
-        <Tooltip><TooltipTrigger asChild><Button size="icon" className="-mt-px rounded-t-none" onClick={fit} disabled={isFit} aria-label="Fit circuit"><Maximize /></Button></TooltipTrigger><TooltipContent side="right">Fit the whole circuit</TooltipContent></Tooltip>
+        <Tooltip><TooltipTrigger asChild><Button size="icon" className="-mt-px rounded-t-none" onClick={fit} disabled={isFit} aria-label="Fit circuit"><Scan /></Button></TooltipTrigger><TooltipContent side="right">Fit the whole circuit</TooltipContent></Tooltip>
       </div>
       {!isFit && <span className="mono pl-0.5 text-[10px] text-fg-dim">{Math.round(v.z * 100)}%</span>}
     </div>
