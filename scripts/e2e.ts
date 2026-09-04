@@ -53,6 +53,7 @@ try {
   assert.ok(text0.includes("DESIGN LOOP") && text0.includes("INSPIRATION") && text0.includes("SIMULATE") && text0.includes("PROJECT") && text0.includes("FORMULA 1") && text0.includes("Reference"), "design loop, inspiration and the circuit switcher visible");
   assert.match(await evalJS<string>("getComputedStyle(document.querySelector('.turn-handle text')).fontFamily"), /Oxanium/, "turn numbers use Oxanium");
   assert.doesNotMatch(await evalJS<string>("getComputedStyle(document.body).fontFamily"), /Oxanium/, "product UI keeps Geist");
+  await shot("/tmp/notasprint-e2e-initial.png");
 
   const before = JSON.parse(await evalJS<string>(`document.modelContext.getTools().then(ts => document.modelContext.executeTool(ts.find(t => t.name === 'get_circuit'), '{}'))`));
   assert.equal(before.design_inspirations?.length, 3, "get_circuit lists the three design inspirations");
@@ -62,6 +63,7 @@ try {
   await new Promise((r) => setTimeout(r, 300));
   const activity = await evalJS<string>("document.body.innerText.includes('WEBMCP') && document.body.innerText.includes('reshape_sector') && document.body.innerText.includes('Faster Sector 3')");
   assert.ok(activity, "agent receipt visible in the panel");
+  await shot("/tmp/notasprint-e2e-agent.png");
   console.log("receipt:", res.receipt);
 
   // Human: drag Turn 7 with the mouse, lock it with L.
@@ -106,6 +108,7 @@ try {
   await new Promise((r) => setTimeout(r, 300));
   const briefText = await evalJS<string>("document.body.innerText");
   assert.ok(briefText.includes("DESIGN BRIEF") && /PASS|FAIL|NEAR LIMIT/.test(briefText) && briefText.includes(`T${lockedNo} · PASS`), "brief statuses and the preserved locked turn render in the panel");
+  await shot("/tmp/notasprint-e2e-locked.png");
 
   // Simulation: cars appear on the live circuit, findings in the panel, a stale flag after the next geometry change.
   const sim = JSON.parse(await evalJS<string>(`document.modelContext.getTools().then(ts => document.modelContext.executeTool(ts.find(t => t.name === 'run_simulation'), JSON.stringify({ seed: 2 })))`));
@@ -114,6 +117,7 @@ try {
   assert.equal(await evalJS<number>("document.querySelectorAll('.sim-car').length"), 12, "12 simulated cars drawn on the canvas");
   const simText = await evalJS<string>("document.body.innerText");
   assert.ok(simText.includes("SIM LAP") && simText.includes("held up") && simText.includes(sim.simulation.findings[0].text.slice(0, 40)), "simulation telemetry and findings visible");
+  await shot("/tmp/notasprint-e2e-simulation.png");
   const res4 = JSON.parse(await evalJS<string>(`document.modelContext.getTools().then(ts => document.modelContext.executeTool(ts.find(t => t.name === 'apply_design_move'), JSON.stringify({ move: 'open_turn', turn: 2, reason: 'Open Turn 2' })))`));
   assert.ok(res4.ok && res4.simulation_stale === true && res4.design_brief, "write receipts flag the stale simulation and carry the brief");
   await new Promise((r) => setTimeout(r, 300));

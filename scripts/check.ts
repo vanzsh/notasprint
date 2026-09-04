@@ -197,13 +197,18 @@ for (const s of SERIES_IDS) {
 const f1Avg = (k: "highSpeed" | "technicality") => Array.from({ length: 20 }, (_, i) => analyze(generateCircuit("f1", i + 1)).scores[k]).reduce((a, b) => a + b, 0) / 20;
 const feAvg = (k: "highSpeed" | "technicality") => Array.from({ length: 20 }, (_, i) => analyze(generateCircuit("fe", i + 1)).scores[k]).reduce((a, b) => a + b, 0) / 20;
 assert.ok(f1Avg("highSpeed") > feAvg("highSpeed") && feAvg("technicality") > f1Avg("technicality"), "Formula 1 concepts read faster, Formula E concepts more technical");
+for (const s of SERIES_IDS) {
+  const fresh = await call("create_custom_circuit", { motorsport: s });
+  assert.deepEqual(fresh.state.warnings, [], `${s} fresh custom concept opens without design warnings`);
+}
 // Through the tool: the demo prompt "Create a custom MotoGP circuit", then the usual loop around a human lock.
 const cc = await call("create_custom_circuit", { motorsport: "MotoGP", seed: 11 });
 assert.ok(cc.state.motorsport.id === "motogp" && cc.state.reference.kind === "custom" && cc.state.reference.seed === 11 && getState().circuit.custom === 11, "custom MotoGP concept loaded");
 const again = await call("create_custom_circuit", { motorsport: "motogp", seed: 11 });
 assert.deepEqual(again.state.turns.map((t: { x: number; y: number }) => [t.x, t.y]), cc.state.turns.map((t: { x: number; y: number }) => [t.x, t.y]), "same seed reproduces the concept");
 assert.equal(JSON.parse(await tools.find((t) => t.name === "create_custom_circuit")!.execute({ motorsport: "rally" })).ok, false, "unknown motorsport refused");
-await call("reshape_sector", { sector: 2, intent: "faster", reason: "Faster, flowing Sector 2" });
+const fasterCustom = await call("reshape_sector", { sector: 2, intent: "faster", reason: "Faster, flowing Sector 2" });
+assert.ok(!fasterCustom.state.warnings.some((w: string) => w.includes("clamped") || w.includes("very close")), `custom MotoGP faster reshape: ${fasterCustom.state.warnings.join(" | ")}`);
 const c7 = getState().circuit.turns[6];
 commit(moveTurn(getState().circuit, c7.id, c7.x + 40, c7.y - 30), { source: "human", changed: [c7.id] });
 commit(setLocks(getState().circuit, [7], true).circuit, { source: "human" });
