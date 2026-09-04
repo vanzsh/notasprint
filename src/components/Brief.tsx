@@ -1,8 +1,14 @@
 "use client";
+import { X } from "lucide-react";
 import { ARCHETYPES, type ArchetypeId } from "@/lib/archetypes";
 import { BRIEF_DEFAULTS, evaluateBrief, isBriefEmpty, type Brief as BriefModel, type ConstraintStatus } from "@/lib/constraints";
 import { setLocks } from "@/lib/moves";
 import { clearBrief, commit, setBrief, useStore } from "@/lib/store";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const STATUS: Record<ConstraintStatus, { text: string; cls: string }> = { pass: { text: "PASS", cls: "text-fg" }, near: { text: "NEAR LIMIT", cls: "text-fg-muted" }, fail: { text: "FAIL", cls: "text-accent" } };
 const rank = (s: ConstraintStatus) => ({ fail: 0, near: 1, pass: 2 })[s];
@@ -43,27 +49,29 @@ export function Brief() {
         <span className="text-fg-dim">≥</span><Num value={brief.minStraight} step={50} onChange={(v) => setBrief({ minStraight: v })} /><span className="text-fg-dim">m</span>
       </Row>
       <Row on={on("profile")} onToggle={() => setBrief({ profile: on("profile") ? null : "high-speed" })} label="Profile" result={status("profile")}>
-        <select value={brief.profile ?? ""} disabled={!on("profile")} onChange={(e) => setBrief({ profile: (e.target.value || null) as ArchetypeId | null })} className="h-6 text-[11px]">
-          {!on("profile") && <option value="">—</option>}
-          {ARCHETYPES.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-        </select>
+        <Select value={brief.profile ?? ""} disabled={!on("profile")} onValueChange={(v) => setBrief({ profile: (v || null) as ArchetypeId | null })}>
+          <SelectTrigger size="sm" aria-label="Target profile" className="w-[124px]"><SelectValue placeholder="—" /></SelectTrigger>
+          <SelectContent>
+            {ARCHETYPES.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+          </SelectContent>
+        </Select>
       </Row>
-      <div className="mono flex flex-wrap items-center gap-1.5 text-[11px]">
+      <div className="mono flex min-h-6 flex-wrap items-center gap-1.5 text-[11px]">
         <span className="w-[104px] shrink-0 text-fg-muted">Preserve</span>
         {preserved.map((id) => {
           const i = circuit.turns.findIndex((t) => t.id === id), r = report.results.find((x) => x.key === "preserve" && x.turnId === id);
           return (
-            <button key={id} onClick={() => preserve(id, false)} title="Remove from brief" className={`chip normal-case tracking-normal ${r?.status === "fail" ? "border-accent text-accent" : "text-fg"}`}>
-              {i >= 0 ? `T${i + 1}` : "removed"} · {r ? STATUS[r.status].text : ""} <span className="text-fg-dim">×</span>
-            </button>
+            <Button key={id} size="sm" onClick={() => preserve(id, false)} title="Remove from brief" className={cn("mono h-5 gap-1 px-1.5 font-normal", r?.status === "fail" && "border-accent text-accent")}>
+              {i >= 0 ? `T${i + 1}` : "removed"} · {r ? STATUS[r.status].text : ""} <X className="size-3 text-fg-dim" />
+            </Button>
           );
         })}
-        {selIdx >= 0 && !preserved.includes(selected!) && <button className="btn h-6" onClick={() => preserve(selected!, true)}>+ T{selIdx + 1}</button>}
+        {selIdx >= 0 && !preserved.includes(selected!) && <Button size="sm" onClick={() => preserve(selected!, true)}>+ T{selIdx + 1}</Button>}
         {!preserved.length && selIdx < 0 && <span className="text-fg-dim">select a turn to preserve it</span>}
       </div>
       <div className="mono flex items-center justify-between pt-1 text-[11px] text-fg-muted">
         <span>{isBriefEmpty(brief) ? "No constraints set · design checks, not certification" : <>{report.passed}/{report.active} pass{report.failed.length ? <span className="text-accent"> · {report.failed.length} failing</span> : null}</>}</span>
-        {!isBriefEmpty(brief) && <button onClick={() => clearBrief()} className="underline decoration-line-strong underline-offset-2 hover:text-fg">Clear</button>}
+        {!isBriefEmpty(brief) && <Button variant="link" className="text-[11px]" onClick={() => clearBrief()}>Clear</Button>}
       </div>
     </div>
   );
@@ -71,13 +79,13 @@ export function Brief() {
 
 function Row({ on, onToggle, label, result, children }: { on: boolean; onToggle: () => void; label: string; result?: { status: ConstraintStatus; actual: string }; children: React.ReactNode }) {
   return (
-    <div className="mono flex items-center gap-1.5 text-[11px]">
-      <label className="flex w-[104px] shrink-0 cursor-pointer items-center gap-2 whitespace-nowrap text-fg-muted"><input type="checkbox" checked={on} onChange={onToggle} />{label}</label>
-      <div className={`flex items-center gap-1 ${on ? "" : "opacity-40"}`}>{children}</div>
+    <div className="mono flex h-6 items-center gap-1.5 text-[11px]">
+      <label className="flex w-[104px] shrink-0 cursor-pointer items-center gap-2 whitespace-nowrap text-fg-muted"><Checkbox checked={on} onCheckedChange={onToggle} />{label}</label>
+      <div className={cn("flex items-center gap-1", !on && "opacity-40")}>{children}</div>
       {on && result && (
         <div className="ml-auto flex min-w-0 items-baseline gap-2 whitespace-nowrap">
           <span className="truncate text-fg-muted" title={result.actual}>{result.actual}</span>
-          <span className={`shrink-0 ${STATUS[result.status].cls}`}>{STATUS[result.status].text}</span>
+          <span className={cn("shrink-0", STATUS[result.status].cls)}>{STATUS[result.status].text}</span>
         </div>
       )}
     </div>
@@ -86,8 +94,8 @@ function Row({ on, onToggle, label, result, children }: { on: boolean; onToggle:
 
 function Num({ value, onChange, disabled, scale = 1, step = 1, placeholder }: { value?: number; onChange: (v: number | null) => void; disabled?: boolean; scale?: number; step?: number; placeholder?: string }) {
   return (
-    <input type="number" step={step} min={0} placeholder={placeholder} value={value === undefined ? "" : Math.round((value / scale) * 100) / 100} disabled={disabled ?? value === undefined}
+    <Input type="number" step={step} min={0} placeholder={placeholder} value={value === undefined ? "" : Math.round((value / scale) * 100) / 100} disabled={disabled ?? value === undefined}
       onChange={(e) => { const n = Number(e.target.value); onChange(e.target.value === "" || !Number.isFinite(n) ? null : n * scale); }}
-      className="field w-[50px]" />
+      className="w-[50px]" />
   );
 }

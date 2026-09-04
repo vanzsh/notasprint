@@ -1,5 +1,13 @@
 @import "tailwindcss";
 
+/* Radix state variants used by the shadcn primitives in src/components/ui */
+@custom-variant data-open (&:where([data-state="open"]));
+@custom-variant data-closed (&:where([data-state="closed"]));
+@custom-variant data-checked (&:where([data-state="checked"]));
+@custom-variant data-disabled (&:where([data-disabled]));
+@custom-variant data-horizontal (&:where([data-orientation="horizontal"]));
+@custom-variant data-vertical (&:where([data-orientation="vertical"]));
+
 :root {
   --bg: #0a0a0a;
   --surface: #111111;
@@ -14,6 +22,24 @@
   --asphalt: #2a2a2a;
   --asphalt-edge: #d9d6cf;
   --ease: cubic-bezier(0.2, 0, 0, 1);
+  /* One radius for every control (buttons, fields, menus, tooltips). Panels and bars stay square. */
+  --radius: 2px;
+
+  /* shadcn semantic tokens, aliased onto the NotASprint palette so primitives inherit the identity. */
+  --background: var(--bg);
+  --foreground: var(--fg);
+  --popover: var(--surface);
+  --popover-foreground: var(--fg);
+  --primary: var(--fg);
+  --primary-foreground: var(--bg);
+  --secondary: var(--surface-2);
+  --secondary-foreground: var(--fg);
+  --muted: var(--surface-2);
+  --muted-foreground: var(--fg-muted);
+  --border: var(--line);
+  --input: var(--line);
+  --ring: var(--line-strong);
+  --destructive: var(--accent);
 }
 
 @theme inline {
@@ -27,49 +53,57 @@
   --color-fg-dim: var(--fg-dim);
   --color-accent: var(--accent);
   --color-accent-dim: var(--accent-dim);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-destructive: var(--destructive);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --font-display: var(--font-barlow);
   --font-track: var(--font-oxanium);
-  --radius: 0;
+  --radius-sm: var(--radius);
+  --radius-md: var(--radius);
+  --radius-lg: var(--radius);
+  --ease-out: var(--ease);
+  --animate-collapse-down: collapse-down 160ms var(--ease);
+  --animate-collapse-up: collapse-up 120ms var(--ease);
+  --animate-pop: pop 120ms var(--ease);
+  @keyframes collapse-down { from { height: 0; opacity: 0; } to { height: var(--radix-collapsible-content-height); opacity: 1; } }
+  @keyframes collapse-up { from { height: var(--radix-collapsible-content-height); opacity: 1; } to { height: 0; opacity: 0; } }
+  @keyframes pop { from { opacity: 0; transform: translateY(-2px); } to { opacity: 1; transform: none; } }
 }
 
-html, body { height: 100%; background: var(--bg); color: var(--fg); overscroll-behavior: none; }
-body { font-family: var(--font-geist-sans), system-ui, sans-serif; font-size: 13px; line-height: 1.4; -webkit-font-smoothing: antialiased; }
-.mono { font-family: var(--font-geist-mono), ui-monospace, monospace; font-variant-numeric: tabular-nums; }
-.display { font-family: var(--font-barlow), var(--font-geist-sans), sans-serif; text-transform: uppercase; letter-spacing: 0.02em; font-weight: 600; }
-/* Spatial circuit annotations drawn on the canvas: turn numbers, sector marks, S/F, on-track telemetry. Not product UI. */
-.track { font-family: var(--font-oxanium), var(--font-geist-mono), monospace; font-weight: 500; letter-spacing: 0.02em; font-variant-numeric: tabular-nums; }
-.label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--fg-muted); }
-
-.btn {
-  height: 28px; padding: 0 10px; font-size: 12px; font-weight: 500; color: var(--fg);
-  background: var(--surface-2); border: 1px solid var(--line); display: inline-flex; align-items: center; gap: 6px;
-  transition: border-color 120ms var(--ease), background 120ms var(--ease), color 120ms var(--ease); white-space: nowrap;
+@layer base {
+  html, body { height: 100%; background: var(--bg); color: var(--fg); overscroll-behavior: none; }
+  body { font-family: var(--font-geist-sans), system-ui, sans-serif; font-size: 13px; line-height: 1.4; -webkit-font-smoothing: antialiased; }
+  * { border-color: var(--line); }
+  button:not(:disabled), [role="button"]:not(:disabled) { cursor: pointer; }
+  :focus-visible { outline: 1px solid var(--fg-muted); outline-offset: 1px; }
 }
-.btn:hover:not(:disabled) { border-color: var(--line-strong); }
-.btn:disabled { color: var(--fg-dim); cursor: default; }
-.btn-primary { background: var(--fg); color: var(--bg); border-color: var(--fg); }
-.btn-primary:hover:not(:disabled) { background: #fff; }
-.btn-on { border-color: var(--accent); color: var(--accent); }
 
-.chip { height: 20px; padding: 0 8px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; border: 1px solid var(--line); display: inline-flex; align-items: center; gap: 6px; color: var(--fg-muted); }
-.dot { width: 6px; height: 6px; border-radius: 50%; background: var(--fg-dim); }
-.dot-on { background: var(--fg); }
+/* Typography roles. In the components layer so utilities (text-[10px], text-fg) can still override them. */
+@layer components {
+  .mono { font-family: var(--font-geist-mono), ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+  .display { font-family: var(--font-barlow), var(--font-geist-sans), sans-serif; text-transform: uppercase; letter-spacing: 0.02em; font-weight: 600; }
+  /* Spatial circuit annotations drawn on the canvas: turn numbers, sector marks, S/F, on-track telemetry. Not product UI. */
+  .track { font-family: var(--font-oxanium), var(--font-geist-mono), monospace; font-weight: 500; letter-spacing: 0.02em; font-variant-numeric: tabular-nums; }
+  .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--fg-muted); }
 
-.field { height: 28px; padding: 0 8px; font-size: 12px; color: var(--fg); background: var(--surface-2); border: 1px solid var(--line); outline: none; font-variant-numeric: tabular-nums; }
-.field:focus { border-color: var(--line-strong); }
-.field:disabled { color: var(--fg-dim); }
-.field::placeholder { color: var(--fg-dim); }
-input[type="number"].field { height: 24px; padding: 0 6px; font-size: 11px; font-family: var(--font-geist-mono), ui-monospace, monospace; -moz-appearance: textfield; appearance: textfield; }
-input[type="number"].field::-webkit-inner-spin-button, input[type="number"].field::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
-input[type="checkbox"] { appearance: none; width: 11px; height: 11px; flex: none; border: 1px solid var(--line-strong); background: var(--surface-2); cursor: pointer; transition: background 120ms var(--ease), border-color 120ms var(--ease); }
-input[type="checkbox"]:checked { background: var(--fg); border-color: var(--fg); }
-
-input[type="range"] { -webkit-appearance: none; appearance: none; width: 100%; height: 1px; background: var(--line-strong); outline: none; }
-input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 10px; height: 10px; background: var(--fg); cursor: ew-resize; }
-input[type="range"]::-moz-range-thumb { width: 10px; height: 10px; background: var(--fg); border: 0; border-radius: 0; cursor: ew-resize; }
-select { background: var(--surface-2); border: 1px solid var(--line); color: var(--fg); height: 28px; padding: 0 8px; font-size: 12px; }
+  /* Status chip: 20px, mono uppercase, hairline. The agent chip keeps this class name for the e2e check. */
+  .chip { height: 20px; padding: 0 8px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; border: 1px solid var(--line); border-radius: var(--radius); display: inline-flex; align-items: center; gap: 6px; color: var(--fg-muted); font-family: var(--font-geist-mono), ui-monospace, monospace; }
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--fg-dim); flex: none; }
+  .dot-on { background: var(--fg); }
+}
 
 @keyframes flash { 0% { fill: var(--accent); stroke: var(--accent); } 100% { fill: var(--bg); stroke: var(--fg); } }
 .flash { animation: flash 900ms var(--ease) forwards; }
@@ -81,3 +115,7 @@ select { background: var(--surface-2); border: 1px solid var(--line); color: var
 .turn-handle { cursor: grab; }
 .turn-handle.locked { cursor: not-allowed; }
 .turn-handle:active { cursor: grabbing; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after { animation-duration: 1ms !important; transition-duration: 1ms !important; }
+}

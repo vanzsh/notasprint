@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Barlow_Condensed, Geist, Geist_Mono, Oxanium } from "next/font/google";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import "./globals.css";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
@@ -16,7 +17,9 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable} ${barlow.variable} ${oxanium.variable} h-full antialiased`}>
-      <body className="h-full overflow-hidden">{children}</body>
+      <body className="h-full overflow-hidden">
+        <TooltipProvider>{children}</TooltipProvider>
+      </body>
     </html>
   );
 }

@@ -7,8 +7,20 @@ import { commit, getState, hydrate, loadCircuit, redo, select, undo, useStore } 
 import { exportJSON, exportSVG } from "@/lib/export";
 import { download } from "@/lib/tools";
 import { registerWebMCP } from "@/lib/webmcp";
+import { ChevronDown, Download, Redo2, Undo2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuShortcut, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Canvas } from "./Canvas";
 import { Panel } from "./Panel";
+
+const AGENT_TEXT = {
+  connected: { label: "Agent connected", tip: "WebMCP tools registered. An agent in this browser reads and edits this live circuit with you." },
+  unavailable: { label: "WebMCP not detected", tip: "Open in ChatGPT's in-app browser or Chrome 149+ with chrome://flags/#enable-webmcp-testing to let an agent design with you." },
+  unknown: { label: "WebMCP", tip: "Checking for a WebMCP agent." },
+} as const;
 
 export function Workspace() {
   const circuit = useStore((s) => s.circuit);
@@ -42,34 +54,57 @@ export function Workspace() {
 
   return (
     <div className="grid h-full grid-rows-[48px_1fr] bg-bg text-fg">
-      <header className="flex items-center gap-4 border-b border-line px-4">
+      <header className="flex items-center gap-3 border-b border-line px-4">
         <div className="flex items-baseline gap-2">
           <span className="display text-[20px] leading-none tracking-[0.04em]">NotASprint</span>
-          <span className="label hidden sm:inline">Circuit Design Lab</span>
+          <span className="label hidden lg:inline">Circuit Design Lab</span>
         </div>
-        <div className="h-4 w-px bg-line" />
-        <label className="flex items-center gap-2">
-          <span className="label">Reference</span>
-          <select value={circuit.id} onChange={(e) => loadCircuit(e.target.value)} aria-label="Reference layout" title="Example starting layouts. Design inspirations are applied to the live circuit from the panel or by the agent.">
-            {CIRCUITS.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
-        </label>
-        <div className="flex items-center gap-1">
-          <button className="btn" onClick={() => undo()} disabled={!canUndo} title="Undo (⌘Z)">Undo</button>
-          <button className="btn" onClick={() => redo()} disabled={!canRedo} title="Redo (⇧⌘Z)">Redo</button>
+        <Separator orientation="vertical" className="h-4" />
+        <div className="flex items-center gap-2">
+          <Tooltip>
+            <TooltipTrigger asChild><span className="label cursor-help">Reference</span></TooltipTrigger>
+            <TooltipContent>Example starting layouts. Design inspirations (in the panel) are characteristics applied to the live circuit.</TooltipContent>
+          </Tooltip>
+          <Select value={circuit.id} onValueChange={(id) => loadCircuit(id)}>
+            <SelectTrigger aria-label="Reference layout" className="min-w-[150px]"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {CIRCUITS.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex items-center">
+          <Tooltip>
+            <TooltipTrigger asChild><Button size="icon" className="rounded-r-none" onClick={() => undo()} disabled={!canUndo} aria-label="Undo"><Undo2 /></Button></TooltipTrigger>
+            <TooltipContent>Undo <kbd>⌘Z</kbd></TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild><Button size="icon" className="-ml-px rounded-l-none" onClick={() => redo()} disabled={!canRedo} aria-label="Redo"><Redo2 /></Button></TooltipTrigger>
+            <TooltipContent>Redo <kbd>⇧⌘Z</kbd></TooltipContent>
+          </Tooltip>
         </div>
         <div className="ml-auto flex items-center gap-3">
-          <span className="chip" title={agent === "connected" ? "WebMCP tools registered — an agent in this browser reads and edits this live circuit with you." : "Open in ChatGPT's in-app browser or Chrome 149+ with chrome://flags/#enable-webmcp-testing to let an agent design with you."}>
-            <span className={`dot ${agent === "connected" ? "dot-on" : ""}`} />
-            {agent === "connected" ? "Agent connected" : agent === "unavailable" ? "WebMCP not detected" : "WebMCP"}
-          </span>
-          <div className="flex items-center gap-1">
-            <button className="btn" onClick={() => exportFile("svg")}>Export SVG</button>
-            <button className="btn btn-primary" onClick={() => exportFile("json")}>Export JSON</button>
-          </div>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="chip" tabIndex={0}>
+                <span className={`dot ${agent === "connected" ? "dot-on" : ""}`} />
+                {AGENT_TEXT[agent].label}
+              </span>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" align="end">{AGENT_TEXT[agent].tip}</TooltipContent>
+          </Tooltip>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button><Download />Export<ChevronDown className="-mr-1 size-3" /></Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="min-w-[200px]">
+              <DropdownMenuLabel>Export {circuit.name}</DropdownMenuLabel>
+              <DropdownMenuItem onSelect={() => exportFile("json")}>JSON<span className="text-fg-muted">definition + analysis</span><DropdownMenuShortcut>.json</DropdownMenuShortcut></DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => exportFile("svg")}>SVG<span className="text-fg-muted">layout drawing</span><DropdownMenuShortcut>.svg</DropdownMenuShortcut></DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </header>
-      <main className="grid min-h-0 grid-cols-[1fr_minmax(320px,26%)]">
+      <main className="grid min-h-0 grid-cols-[1fr_minmax(320px,min(26%,400px))]">
         <div className="relative min-w-0 overflow-hidden">
           <Canvas />
         </div>
