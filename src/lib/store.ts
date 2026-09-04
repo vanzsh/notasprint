@@ -120,10 +120,17 @@ export function loadCircuit(id: string, source: "agent" | "human" = "human") {
   if (!c) throw new Error(`Unknown circuit "${id}". Available: ${CIRCUITS.map((x) => x.id).join(", ")}`);
   return mount(c, source, `Loaded ${c.name}`);
 }
-/** Generate and load a custom concept for a discipline. Omit the seed for a fresh one; pass it to reproduce. */
-export function loadCustom(series: SeriesId, seed = freshSeed(), source: "agent" | "human" = "human") {
-  const c = generateCircuit(series, seed);
-  return mount(c, source, `Generated ${SERIES[series].name} concept · seed ${seed}`);
+/** Generate and load a custom concept for a discipline. Fresh concepts skip seeds that open with design warnings; an explicit seed is reproduced exactly. */
+export function loadCustom(series: SeriesId, seed?: number, source: "agent" | "human" = "human") {
+  let chosen = seed ?? freshSeed();
+  let c = generateCircuit(series, chosen);
+  if (seed === undefined) {
+    for (let attempt = 0; attempt < 24 && analyze(c).warnings.length; attempt++) {
+      chosen = freshSeed();
+      c = generateCircuit(series, chosen);
+    }
+  }
+  return mount(c, source, `Generated ${SERIES[series].name} concept · seed ${chosen}`);
 }
 
 export const select = (id: string | null) => set({ selected: id });

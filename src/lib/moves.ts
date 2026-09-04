@@ -140,7 +140,7 @@ export function reshapeSector(c: Circuit, sector: 1 | 2 | 3, intent: SectorInten
         const kink = a.turns.find((x) => x.sector === sector && !x.locked && x.type === "kink");
         if (kink && out.circuit.turns.length > 5) merge(deleteTurn(out.circuit, kink.turn - 1));
       }
-      return out;
+      return fitRadii(out, c);
     }
     case "more_technical": {
       merge(editTurns(c, free.map(({ t, i }) => ({ turn: i + 1, radius: Math.max(18, t.radius * level(intensity, 0.8, 0.65, 0.5)) }))));
@@ -151,13 +151,13 @@ export function reshapeSector(c: Circuit, sector: 1 | 2 | 3, intent: SectorInten
         const j = out.circuit.turns.findIndex((t) => t.id === c.turns[straights[1].i].id);
         merge(applyDesignMove(out.circuit, "add_esses_after", j + 1, "subtle"));
       }
-      return out;
+      return fitRadii(out, c);
     }
     case "more_overtaking": {
       const a = analyze(c);
       const cand = a.turns.filter((x) => x.sector === sector && !x.locked && x.overtaking < 70 && x.type !== "kink").sort((p, q) => q.approach - p.approach)[0];
       if (!cand) throw new Error(`No unlocked turn in Sector ${sector} can become an overtaking zone.`);
-      return applyDesignMove(c, "create_overtaking_zone", cand.turn, intensity);
+      return fitRadii(applyDesignMove(c, "create_overtaking_zone", cand.turn, intensity), c);
     }
   }
 }
@@ -168,14 +168,30 @@ type Result = { circuit: Circuit; changed: string[] };
 
 // Shrink requested radii to what the neighbouring fillets allow, so nothing is silently clamped. Corners that existed
 // in `base` never drop below their base radius (opening is best-effort, tightening is kept); new corners take what fits.
+// If opening two neighbours would leave no usable straight between them, roll those openings back to the base radii.
 function fitRadii(r: Result, base: Circuit): Result {
   const g = buildGeometry(r.circuit.turns);
-  const turns = r.circuit.turns.map((t, i) => {
+  let turns = r.circuit.turns.map((t, i) => {
     const c = g.corners[i];
     if (!r.changed.includes(t.id) || c.requestedRadius - c.radius <= 5) return t;
     const b = base.turns.find((x) => x.id === t.id);
     return { ...t, radius: Math.max(b ? Math.min(b.radius, t.radius) : 12, Math.round(c.radius)) };
   });
+  for (let pass = 0; pass < 2; pass++) {
+    const fitted = buildGeometry(turns);
+    let repaired = false;
+    turns = turns.map((t, i) => {
+      const previous = fitted.corners[(i - 1 + turns.length) % turns.length];
+      const current = fitted.corners[i];
+      const tooClose = (previous.straightAfter < 25 && previous.straightAfter + previous.arcLength < 60)
+        || (current.straightAfter < 25 && current.straightAfter + current.arcLength < 60);
+      const b = base.turns.find((x) => x.id === t.id);
+      if (!tooClose || !b || !r.changed.includes(t.id) || t.radius <= b.radius) return t;
+      repaired = true;
+      return { ...t, radius: b.radius };
+    });
+    if (!repaired) break;
+  }
   return { circuit: withTurns(r.circuit, turns), changed: r.changed };
 }
 

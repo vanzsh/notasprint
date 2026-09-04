@@ -91,6 +91,19 @@ assert.equal(resolveArchetype("monaco inspired")?.id, "street-technical");
 assert.equal(resolveArchetype("Suzuka style flow")?.id, "flowing-technical");
 assert.equal(resolveArchetype("technical"), undefined, "ambiguous phrases are not guessed");
 
+// WebMCP contract (spec § 4.2.1 + Chrome character budgets). Every tool states readOnlyHint explicitly — a tool
+// registered without annotations is reported as `annotations: undefined` and ChatGPT Site Tools counts it as neither
+// read nor write. Only the two pure reads are read-only; export writes a file, design_versions can restore.
+const SPEC_ANNOTATIONS = ["readOnlyHint", "untrustedContentHint", "consequentialHint"];
+assert.equal(tools.length, 14, "the 14-tool surface is frozen");
+for (const t of tools) {
+  assert.equal(typeof t.annotations.readOnlyHint, "boolean", `${t.name} states readOnlyHint explicitly`);
+  assert.ok(Object.keys(t.annotations).every((k) => SPEC_ANNOTATIONS.includes(k)), `${t.name} uses only WebMCP ToolAnnotations (${Object.keys(t.annotations)})`);
+  assert.ok(t.name.length <= 30 && /^[a-z0-9_]+$/.test(t.name), `${t.name} name budget`);
+  assert.ok(t.description.length <= 500, `${t.name} description ${t.description.length} > 500 chars`);
+  for (const [k, p] of Object.entries((t.inputSchema as { properties?: Record<string, { description?: string }> }).properties ?? {})) assert.ok((p.description?.length ?? 0) <= 150 && k.length <= 30, `${t.name}.${k} parameter budget`);
+}
+assert.deepEqual(tools.filter((t) => t.annotations.readOnlyHint).map((t) => t.name), ["get_circuit", "analyze_circuit"], "exactly the two pure reads are read-only");
 // Tool surface: existing names stay, read tools expose the archetypes and tag the reference layouts.
 const names = tools.map((t) => t.name);
 for (const n of ["get_circuit", "analyze_circuit", "apply_design_move", "reshape_sector", "edit_turns", "set_turn_locks", "load_reference_circuit", "undo_changes", "export_circuit", "apply_design_inspiration"]) assert.ok(names.includes(n), n);

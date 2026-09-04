@@ -47,6 +47,11 @@ try {
   const names = await evalJS<string[]>("document.modelContext.getTools().then(ts => ts.map(t => t.name).sort())");
   console.log("registered tools:", names.join(", "));
   assert.ok(names.includes("get_circuit") && names.includes("reshape_sector") && names.includes("apply_design_inspiration"), "tools registered via WebMCP");
+  // As the browser reports them: 14 tools, every one carrying an explicit readOnlyHint, exactly two of them read-only.
+  const ann = await evalJS<[string, boolean | null][]>("document.modelContext.getTools().then(ts => ts.map(t => [t.name, t.annotations ? t.annotations.readOnlyHint : null]))");
+  assert.equal(ann.length, 14, "14 tools registered");
+  assert.ok(ann.every(([, r]) => typeof r === "boolean"), `every tool has annotations.readOnlyHint: ${JSON.stringify(ann.filter(([, r]) => r === null))}`);
+  assert.deepEqual(ann.filter(([, r]) => r).map(([n]) => n).sort(), ["analyze_circuit", "get_circuit"], "read-only set");
   assert.equal(await evalJS<string>("document.querySelector('.chip')?.textContent?.trim()"), "Agent connected");
   // Onboarding and inspiration UI are visible without any interaction; circuit annotations render in Oxanium.
   const text0 = await evalJS<string>("document.body.innerText");
