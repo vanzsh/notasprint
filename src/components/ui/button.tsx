@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils"
  * `data-on` marks a persistent selected state (a lock that is on, a version being compared).
  */
 const buttonVariants = cva(
-  "inline-flex shrink-0 select-none items-center justify-center gap-1.5 whitespace-nowrap rounded-sm border font-medium transition-[border-color,background-color,color] duration-120 ease-out outline-none focus-visible:outline focus-visible:outline-1 focus-visible:outline-fg-muted disabled:pointer-events-none disabled:border-line disabled:bg-surface-2 disabled:text-fg-dim [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5 [&_kbd]:text-fg-dim",
+  "inline-flex shrink-0 select-none items-center justify-center gap-1.5 whitespace-nowrap rounded-sm border font-medium transition-[border-color,background-color,color] duration-120 ease-out outline-none focus-visible:outline focus-visible:outline-1 focus-visible:outline-fg-muted disabled:pointer-events-none disabled:border-line disabled:bg-surface-2 disabled:text-fg-dim [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5",
   {
     variants: {
       variant: {

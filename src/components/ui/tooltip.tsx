@@ -42,7 +42,7 @@ function TooltipContent({
         data-slot="tooltip-content"
         sideOffset={sideOffset}
         className={cn(
-          "animate-pop z-50 w-fit max-w-[260px] rounded-sm border border-line-strong bg-surface px-2 py-1 text-[11px] leading-snug text-fg [&_kbd]:mono [&_kbd]:text-fg-dim",
+          "animate-pop z-50 w-fit max-w-[260px] rounded-sm border border-line-strong bg-surface px-2 py-1 text-[11px] leading-snug text-fg",
           className
         )}
         {...props}

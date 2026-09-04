@@ -7,6 +7,7 @@ import { commit, getState, hydrate, redo, select, undo, useStore } from "@/lib/s
 import { registerWebMCP } from "@/lib/webmcp";
 import { Redo2, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Kbd } from "@/components/ui/kbd";
 import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Canvas } from "./Canvas";
@@ -67,11 +68,11 @@ export function Workspace() {
         <div className="flex items-center">
           <Tooltip>
             <TooltipTrigger asChild><Button size="icon" className="rounded-r-none" onClick={() => undo()} disabled={!canUndo} aria-label="Undo"><Undo2 /></Button></TooltipTrigger>
-            <TooltipContent>Undo <kbd>⌘Z</kbd></TooltipContent>
+            <TooltipContent>Undo <Kbd>⌘Z</Kbd></TooltipContent>
           </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild><Button size="icon" className="-ml-px rounded-l-none" onClick={() => redo()} disabled={!canRedo} aria-label="Redo"><Redo2 /></Button></TooltipTrigger>
-            <TooltipContent>Redo <kbd>⇧⌘Z</kbd></TooltipContent>
+            <TooltipContent>Redo <Kbd>⇧⌘Z</Kbd></TooltipContent>
           </Tooltip>
         </div>
         <div className="ml-auto flex items-center gap-3">

@@ -10,6 +10,7 @@ import { seriesById } from "@/lib/series";
 import { commit, getState, loadCustom, preview, resetCircuit, SCORE_LABEL, select, undo, useStore, type Receipt } from "@/lib/store";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Kbd } from "@/components/ui/kbd";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -207,7 +208,7 @@ export function Panel({ onLibrary, onExport, onPresent }: { onLibrary: () => voi
         {events.length ? (
           <div className="space-y-1.5">{events.slice(0, 3).map((e, i) => <Event key={e.id} e={e} latest={i === 0} />)}</div>
         ) : (
-          <div className="text-[12px] text-fg-dim">No changes yet. Agent tool calls and your edits are recorded here · <kbd className="mono text-fg-muted">⌘Z</kbd> undo</div>
+          <div className="text-[12px] text-fg-dim">No changes yet. Agent tool calls and your edits are recorded here · <Kbd>⌘Z</Kbd> undo</div>
         )}
       </div>
 
@@ -339,7 +340,7 @@ function Inspector({ i }: { i: number }) {
       <div className="flex flex-wrap gap-1.5">
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button data-on={t.locked} onClick={toggleLock} aria-pressed={t.locked}>{t.locked ? <Lock /> : <LockOpen />}{t.locked ? "Locked" : "Lock"} <kbd className="mono text-[10px]">L</kbd></Button>
+            <Button data-on={t.locked} onClick={toggleLock} aria-pressed={t.locked}>{t.locked ? <Lock /> : <LockOpen />}{t.locked ? "Locked" : "Lock"} <Kbd>L</Kbd></Button>
           </TooltipTrigger>
           <TooltipContent>{t.locked ? "No tool can move, resize or delete this turn." : "Keep this turn exactly where it is; the agent designs around it."}</TooltipContent>
         </Tooltip>
@@ -348,7 +349,7 @@ function Inspector({ i }: { i: number }) {
           <TooltipTrigger asChild>
             <Button variant="ghost" size="icon" aria-label="Remove turn" disabled={t.locked || circuit.turns.length <= 4} onClick={() => { commit(deleteTurn(circuit, i).circuit, { source: "human", label: `Removed T${i + 1}` }); select(null); }}><Trash2 /></Button>
           </TooltipTrigger>
-          <TooltipContent>{t.locked ? "Unlock the turn to remove it." : circuit.turns.length <= 4 ? "A circuit keeps at least four turns." : <>Remove turn <kbd>⌫</kbd></>}</TooltipContent>
+          <TooltipContent>{t.locked ? "Unlock the turn to remove it." : circuit.turns.length <= 4 ? "A circuit keeps at least four turns." : <>Remove turn <Kbd>⌫</Kbd></>}</TooltipContent>
         </Tooltip>
       </div>
     </div>
@@ -361,11 +362,11 @@ function DesignLoop() {
   return (
     <div className="space-y-1.5">
       <div className="display text-[15px] text-fg">Drag → Lock → Ask agent → Continue</div>
-      <ol className="space-y-0.5 text-[12px] leading-snug text-fg-muted [&_kbd]:mono [&_kbd]:text-fg">
+      <ol className="space-y-0.5 text-[12px] leading-snug text-fg-muted">
         <li><span className="text-fg">Drag</span> to move · click to inspect · double-click to add</li>
-        <li><kbd>L</kbd> locks a turn — no tool can move or delete it</li>
+        <li><Kbd>L</Kbd> locks a turn — no tool can move or delete it</li>
         <li><span className="text-fg">Ask</span> the agent — it edits this live circuit, not a copy</li>
-        <li><kbd>⌘Z</kbd> undo · <kbd>⇧⌘Z</kbd> redo</li>
+        <li><Kbd>⌘Z</Kbd> undo · <Kbd>⇧⌘Z</Kbd> redo</li>
       </ol>
       <div className="text-[12px] text-fg-dim">
         {agent === "connected" ? "Agent connected · tool calls edit this circuit" : agent === "unavailable" ? <>No WebMCP agent detected · use the ChatGPT desktop browser or Chrome 149+ with <span className="mono">chrome://flags/#enable-webmcp-testing</span></> : "Checking for a WebMCP agent"}

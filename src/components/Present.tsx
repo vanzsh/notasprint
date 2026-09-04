@@ -5,6 +5,7 @@ import { fmtKm, fmtLap } from "@/lib/circuit";
 import { seriesById } from "@/lib/series";
 import { SCORE_LABEL, useStore } from "@/lib/store";
 import { Button } from "@/components/ui/button";
+import { Kbd } from "@/components/ui/kbd";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Canvas } from "./Canvas";
 
@@ -28,7 +29,7 @@ export function Present({ onExit }: { onExit: () => void }) {
           <div className="mt-2 max-w-[520px] text-[13px] text-fg-muted">{circuit.tagline}</div>
         </div>
         <div className="pointer-events-auto flex items-center gap-3">
-          <span className="text-[11px] text-fg-dim"><kbd className="mono">Esc</kbd> to exit</span>
+          <span className="text-[11px] text-fg-dim"><Kbd>Esc</Kbd> to exit</span>
           <Tooltip>
             <TooltipTrigger asChild><Button size="icon" onClick={onExit} aria-label="Exit presentation"><Minimize2 /></Button></TooltipTrigger>
             <TooltipContent>Back to the workspace</TooltipContent>
